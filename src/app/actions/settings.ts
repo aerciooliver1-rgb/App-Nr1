@@ -1,0 +1,130 @@
+'use server'
+
+import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+
+// ─── Tipos ───────────────────────────────────────────────────────────────────
+
+export type SettingsFormState = {
+  error?: string
+  success?: boolean
+  errors?: Record<string, string[]>
+} | undefined
+
+// ─── Atualizar nome de exibição ───────────────────────────────────────────────
+
+export async function updateProfile(
+  prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const supabase = await createClient()
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) return { error: 'Informe o nome.' }
+
+  const { error } = await supabase.auth.updateUser({ data: { name } })
+  if (error) return { error: error.message }
+
+  revalidatePath('/configuracoes')
+  return { success: true }
+}
+
+// ─── Alterar senha ────────────────────────────────────────────────────────────
+
+const passwordSchema = z
+  .object({
+    password: z.string().min(8, 'Mínimo 8 caracteres'),
+    confirm: z.string(),
+  })
+  .refine(d => d.password === d.confirm, {
+    message: 'Senhas não coincidem',
+    path: ['confirm'],
+  })
+
+export async function updatePassword(
+  prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const supabase = await createClient()
+
+  const validated = passwordSchema.safeParse(Object.fromEntries(formData))
+  if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
+
+  const { error } = await supabase.auth.updateUser({ password: validated.data.password })
+  if (error) return { error: error.message }
+
+  return { success: true }
+}
+
+// ─── Atualizar dados da empresa ───────────────────────────────────────────────
+
+export async function updateCompany(
+  prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.' }
+
+  const companyId = formData.get('company_id') as string
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) return { error: 'Informe o nome da empresa.' }
+
+  const { error } = await supabase
+    .from('companies')
+    .update({ name })
+    .eq('id', companyId)
+    .eq('created_by', user.id)
+
+  if (error) return { error: 'Erro ao atualizar empresa.' }
+
+  revalidatePath('/configuracoes')
+  revalidatePath('/empresas')
+  return { success: true }
+}
+
+// ─── Upload de logo da empresa ────────────────────────────────────────────────
+
+export async function uploadCompanyLogo(
+  prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.' }
+
+  const companyId = formData.get('company_id') as string
+  const file = formData.get('logo') as File
+
+  if (!file || file.size === 0) return { error: 'Selecione uma imagem.' }
+  if (file.size > 2 * 1024 * 1024) return { error: 'Imagem deve ter no máximo 2 MB.' }
+  if (!file.type.startsWith('image/')) return { error: 'Arquivo deve ser uma imagem (JPG, PNG ou SVG).' }
+
+  const ext = file.name.split('.').pop() ?? 'png'
+  const path = `companies/${companyId}/logo.${ext}`
+
+  const serviceClient = await createServiceClient()
+  const { error: uploadError } = await serviceClient.storage
+    .from('logos')
+    .upload(path, file, { upsert: true, contentType: file.type })
+
+  if (uploadError) {
+    return {
+      error: `Erro no upload: ${uploadError.message}. Certifique-se de criar o bucket "logos" no Supabase Storage (público).`,
+    }
+  }
+
+  const { data: { publicUrl } } = serviceClient.storage.from('logos').getPublicUrl(path)
+
+  const { error: updateError } = await supabase
+    .from('companies')
+    .update({ logo_url: publicUrl })
+    .eq('id', companyId)
+    .eq('created_by', user.id)
+
+  if (updateError) return { error: 'Upload feito, mas erro ao salvar URL.' }
+
+  revalidatePath('/configuracoes')
+  revalidatePath('/empresas')
+  return { success: true }
+}
