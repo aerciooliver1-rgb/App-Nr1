@@ -99,6 +99,14 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
                     </div>
                     <div className="flex items-center gap-3">
                       {risk && <RiskBadge level={risk} />}
+                      {sector.assessments.length > 0 && (
+                        <Link
+                          href={`/empresas/${id}/setores/${sector.id}/historico`}
+                          className="text-sm font-medium text-gray-600 hover:underline"
+                        >
+                          Ver histórico
+                        </Link>
+                      )}
                       <Link
                         href={`/empresas/${id}/setores/${sector.id}/avaliacao/nova`}
                         className="text-sm font-medium text-blue-600 hover:underline"

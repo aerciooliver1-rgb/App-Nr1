@@ -15,7 +15,7 @@ test.describe('Empresas', () => {
     await page.goto('/empresas')
     await page.getByText('HealthTech Soluções').click()
     await expect(page).toHaveURL(/empresas\/[0-9a-f-]+/)
-    await expect(page.getByText('Desenvolvimento de Software')).toBeVisible()
+    await expect(page.getByText('Desenvolvimento de Software').first()).toBeVisible()
   })
 
   test('navega para histórico do setor', async ({ page }) => {
