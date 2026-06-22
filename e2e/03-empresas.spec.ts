@@ -23,7 +23,7 @@ test.describe('Empresas', () => {
     await page.getByText('HealthTech Soluções').click()
     await page.getByRole('link', { name: /histórico|ver histórico/i }).click()
     await expect(page).toHaveURL(/historico/)
-    await expect(page.getByText(/ciclo/i)).toBeVisible()
+    await expect(page.getByText(/ciclo/i).first()).toBeVisible()
   })
 
   test('empresa crítica exibe indicador de nível', async ({ page }) => {

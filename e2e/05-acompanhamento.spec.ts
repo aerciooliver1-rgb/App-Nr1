@@ -7,8 +7,7 @@ test.describe('Acompanhamento Kanban e Lista', () => {
     await page.goto('/empresas')
     await page.getByText(empresa).click()
     await page.getByRole('link', { name: /histórico/i }).click()
-    await page.getByText(/ciclo/i).first().click()
-    await page.getByRole('link', { name: /acompanhamento|próximo/i }).click()
+    await page.getByRole('link', { name: /acompanhamento/i }).click()
     await page.waitForURL(/acompanhamento/)
   }
 
@@ -36,11 +35,11 @@ test.describe('Acompanhamento Kanban e Lista', () => {
 
   test('ações atrasadas aparecem no Callcenter', async ({ page }) => {
     await irParaAcompanhamento(page, 'Callcenter Rápido S/A')
-    await expect(page.getByText(/atrasada/i)).toBeVisible()
+    await expect(page.getByText(/atrasada/i).first()).toBeVisible()
   })
 
   test('barra de progresso exibe percentual', async ({ page }) => {
     await irParaAcompanhamento(page, 'HealthTech Soluções')
-    await expect(page.getByText(/%/)).toBeVisible()
+    await expect(page.getByText(/%/).first()).toBeVisible()
   })
 })

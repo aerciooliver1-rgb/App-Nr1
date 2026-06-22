@@ -24,7 +24,7 @@ async function getData(assessmentId: string) {
 
   const { data: plan } = await supabase
     .from('action_plans')
-    .select('id, status, assessments(sectors(name, company_id:sectors(company_id)))')
+    .select('id, status')
     .eq('assessment_id', assessmentId)
     .maybeSingle()
 

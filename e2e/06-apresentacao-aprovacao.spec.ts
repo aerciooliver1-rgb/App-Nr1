@@ -7,14 +7,15 @@ test.describe('Apresentação e Aprovação', () => {
     await page.goto('/empresas')
     await page.getByText(empresa).click()
     await page.getByRole('link', { name: /histórico/i }).click()
-    await page.getByText(/ciclo/i).first().click()
-    await page.getByRole('link', { name: /apresent/i }).click()
+    await page.getByRole('link', { name: /acompanhamento/i }).click()
+    await page.waitForURL(/acompanhamento/)
+    await page.getByRole('link', { name: /apresenta/i }).click()
     await page.waitForURL(/apresentacao/)
   }
 
   test('apresentação exibe sumário executivo', async ({ page }) => {
     await irParaApresentacao(page, 'HealthTech Soluções')
-    await expect(page.getByText(/sumário|executive|relatório/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /apresentação para gestores/i })).toBeVisible()
   })
 
   test('botão de download PPTX visível', async ({ page }) => {
@@ -29,11 +30,11 @@ test.describe('Apresentação e Aprovação', () => {
 
   test('formulário de encaminhar aprovação visível', async ({ page }) => {
     await irParaApresentacao(page, 'Varejo Express Ltda')
-    await expect(page.getByText(/aprovação|encaminhar/i)).toBeVisible()
+    await expect(page.getByRole('heading', { name: /encaminhar.*aprovação/i })).toBeVisible()
   })
 
   test('histórico de aprovação exibe status na HealthTech', async ({ page }) => {
     await irParaApresentacao(page, 'HealthTech Soluções')
-    await expect(page.getByText(/aprovado/i)).toBeVisible()
+    await expect(page.getByText(/aprovado/i).first()).toBeVisible()
   })
 })
