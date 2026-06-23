@@ -82,9 +82,9 @@ function EvidencePanel({ actionId, onClose }: { actionId: string; onClose: () =>
   }
 
   function fileIcon(type: string) {
-    if (type === 'application/pdf') return '📄'
-    if (type.startsWith('image/')) return '🖼'
-    return '📎'
+    if (type === 'application/pdf') return 'PDF'
+    if (type.startsWith('image/')) return 'IMG'
+    return 'ARQ'
   }
 
   return (
@@ -101,7 +101,13 @@ function EvidencePanel({ actionId, onClose }: { actionId: string; onClose: () =>
       )}
       {!loading && (evidences ?? []).map(ev => (
         <div key={ev.id} className="mb-1.5 flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs shadow-sm">
-          <span>{fileIcon(ev.file_type)}</span>
+          <span className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-bold ${
+            ev.file_type === 'application/pdf' ? 'bg-red-100 text-red-700' :
+            ev.file_type.startsWith('image/') ? 'bg-blue-100 text-blue-700' :
+            'bg-gray-100 text-gray-600'
+          }`}>
+            {fileIcon(ev.file_type)}
+          </span>
           <a
             href={ev.file_url}
             target="_blank"

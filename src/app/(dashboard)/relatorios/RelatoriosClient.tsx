@@ -8,20 +8,13 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   Cell,
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts'
+import { RiskBadge } from '@/components/features/RiskBadge'
 import type { AssessmentRow } from './page'
 import type { RiskLevel } from '@/types/database'
-
-const LEVEL_BG: Record<RiskLevel, string> = {
-  baixo: 'bg-green-100 text-green-800',
-  moderado: 'bg-yellow-100 text-yellow-800',
-  alto: 'bg-orange-100 text-orange-800',
-  critico: 'bg-red-100 text-red-800',
-}
 
 const LEVEL_COLOR: Record<RiskLevel, string> = {
   baixo: '#16a34a',
@@ -82,7 +75,7 @@ export function RelatoriosClient({ rows }: Props) {
       {/* Gráfico de scores por empresa */}
       {chartData.length > 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 font-semibold text-gray-800">Score Médio por Empresa</h3>
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Score Médio por Empresa</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -143,16 +136,16 @@ export function RelatoriosClient({ rows }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
-                <th className="px-4 py-3 text-left font-medium">Empresa</th>
-                <th className="px-4 py-3 text-left font-medium">Setor</th>
-                <th className="px-4 py-3 text-center font-medium">Ciclo</th>
-                <th className="px-4 py-3 text-center font-medium">Modo</th>
-                <th className="px-4 py-3 text-center font-medium">Score</th>
-                <th className="px-4 py-3 text-center font-medium">Nível</th>
-                <th className="px-4 py-3 text-center font-medium">Críticos</th>
-                <th className="px-4 py-3 text-center font-medium">Data</th>
-                <th className="px-4 py-3 text-center font-medium">Exportar</th>
+              <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-400">
+                <th className="px-4 py-3 text-left font-semibold uppercase tracking-wide">Empresa</th>
+                <th className="px-4 py-3 text-left font-semibold uppercase tracking-wide">Setor</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Ciclo</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Modo</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Score</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Nível</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Críticos</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Data</th>
+                <th className="px-4 py-3 text-center font-semibold uppercase tracking-wide">Exportar</th>
               </tr>
             </thead>
             <tbody>
@@ -177,9 +170,7 @@ export function RelatoriosClient({ rows }: Props) {
                       {row.overallScore}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${LEVEL_BG[row.worstLevel]}`}>
-                        {row.worstLevel}
-                      </span>
+                      <RiskBadge level={row.worstLevel} />
                     </td>
                     <td className="px-4 py-3 text-center">
                       {row.criticalCount > 0 ? (

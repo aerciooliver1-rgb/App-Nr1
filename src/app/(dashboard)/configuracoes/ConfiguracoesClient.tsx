@@ -64,7 +64,7 @@ function PerfilTab({ userName, userEmail }: { userName: string; userEmail: strin
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 font-semibold text-gray-900">Dados do Perfil</h3>
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Dados do Perfil</h3>
 
         {profileState?.success && <SuccessBanner message="Nome atualizado com sucesso." />}
         {profileState?.error && <ErrorBanner message={profileState.error} />}
@@ -95,7 +95,7 @@ function PerfilTab({ userName, userEmail }: { userName: string; userEmail: strin
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 font-semibold text-gray-900">Alterar Senha</h3>
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Alterar Senha</h3>
 
         {passwordState?.success && <SuccessBanner message="Senha alterada com sucesso." />}
         {passwordState?.error && <ErrorBanner message={passwordState.error} />}
@@ -176,7 +176,7 @@ function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
       )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 font-semibold text-gray-900">Dados da Empresa</h3>
+        <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Dados da Empresa</h3>
 
         {companyState?.success && <SuccessBanner message="Empresa atualizada." />}
         {companyState?.error && <ErrorBanner message={companyState.error} />}
@@ -200,7 +200,7 @@ function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-1 font-semibold text-gray-900">Logo da Empresa</h3>
+        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Logo da Empresa</h3>
         <p className="mb-4 text-xs text-gray-400">JPG, PNG ou SVG · máx. 2 MB</p>
 
         {(previewUrl ?? selectedCompany?.logo_url) && (
@@ -286,7 +286,7 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
     <div className="space-y-6">
       {/* Convidar usuário */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-1 font-semibold text-gray-900">Convidar Usuário</h3>
+        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Convidar Usuário</h3>
         <p className="mb-4 text-xs text-gray-400">Um e-mail de convite será enviado com link de acesso.</p>
 
         {inviteState?.success && <SuccessBanner message="Convite enviado com sucesso." />}
@@ -341,7 +341,7 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
       {/* Lista de usuários */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-5 py-3">
-          <h3 className="font-semibold text-gray-900">Usuários Ativos</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Usuários Ativos</h3>
           <p className="text-xs text-gray-400">{users.length} usuário(s) cadastrado(s)</p>
         </div>
 
@@ -417,8 +417,8 @@ export function ConfiguracoesClient({
             onClick={() => setTab(t.id)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
               tab === t.id
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-800'
             }`}
           >
             {t.label}

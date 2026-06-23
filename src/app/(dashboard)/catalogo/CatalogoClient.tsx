@@ -35,7 +35,7 @@ function NewProgramForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="mb-4 font-semibold text-gray-900">Novo Programa Padrão</h3>
+      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Novo Programa</h3>
 
       {state?.error && (
         <div className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</div>
@@ -202,7 +202,7 @@ export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRo
           onClick={() => setShowForm(s => !s)}
           className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
         >
-          {showForm ? '✕ Cancelar' : '+ Novo Programa'}
+          {showForm ? 'Cancelar' : '+ Novo Programa'}
         </button>
       </div>
 

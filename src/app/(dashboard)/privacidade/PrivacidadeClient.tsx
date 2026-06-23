@@ -128,7 +128,7 @@ function UserCard({
             disabled={exporting}
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            {exporting ? 'Exportando…' : '↓ Exportar JSON'}
+            {exporting ? 'Exportando…' : 'Exportar JSON'}
           </button>
           <button
             onClick={() => setShowDelete(s => !s)}

@@ -8,17 +8,18 @@ import { FACTORS } from '@/lib/data/questions'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
 
-const CONSEQUENCE_MAP: Record<string, string> = {
-  'Transtorno mental': 'Transtorno mental',
-  'Transtorno mental; DORT': 'Transtorno mental, DORT',
-  'Transtorno mental; Fadiga': 'Transtorno mental, Fadiga',
+const RISK_STRIPE: Record<RiskLevel, string> = {
+  baixo:    'border-t-emerald-500',
+  moderado: 'border-t-amber-500',
+  alto:     'border-t-orange-500',
+  critico:  'border-t-red-600',
 }
 
-const RISK_THRESHOLD: Record<RiskLevel, string> = {
-  baixo: '0–25 pontos',
-  moderado: '26–50 pontos',
-  alto: '51–75 pontos',
-  critico: '76–100 pontos',
+const RISK_BAR: Record<RiskLevel, string> = {
+  baixo:    'bg-emerald-500',
+  moderado: 'bg-amber-500',
+  alto:     'bg-orange-500',
+  critico:  'bg-red-600',
 }
 
 async function getResultado(assessmentId: string) {
@@ -52,7 +53,6 @@ export default async function ResultadoPage({
   const { assessment, scores } = data
   const sector = assessment.sectors as { name: string } | null
 
-  // Enriquece com dados dos fatores para o gráfico
   const chartData = FACTORS.map(factor => {
     const score = scores.find(s => s.factor_id === factor.id)
     return {
@@ -79,26 +79,34 @@ export default async function ResultadoPage({
       <div className="p-6 flex flex-col gap-6">
 
         {/* Score geral */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
+        <div className={`rounded-xl border border-gray-200 border-t-4 bg-white p-6 shadow-sm ${RISK_STRIPE[overallLevel]}`}>
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-gray-500">Score geral do setor</p>
-              <p className="mt-1 text-4xl font-bold text-gray-900">{overallScore}<span className="text-xl text-gray-400">/100</span></p>
-              <p className="mt-1 text-sm text-gray-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Score geral do setor</p>
+              <p className="mt-1 text-5xl font-bold tabular-nums text-gray-900">
+                {overallScore}
+                <span className="text-2xl font-normal text-gray-300">/100</span>
+              </p>
+              <p className="mt-2 text-xs text-gray-400">
                 Modo {assessment.mode} · Ciclo #{assessment.cycle} · {formatDate(assessment.created_at)}
               </p>
             </div>
-            <RiskBadge level={overallLevel} className="text-base px-4 py-2" />
+            <RiskBadge level={overallLevel} className="text-sm px-3 py-1" />
           </div>
         </div>
 
         {/* Alertas críticos/altos */}
         {(critical.length > 0 || high.length > 0) && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-800 mb-2">Fatores que exigem ação imediata:</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-700">
+              Fatores que exigem ação imediata
+            </p>
             <div className="flex flex-wrap gap-2">
               {[...critical, ...high].map(f => (
-                <span key={f.factorId} className="rounded-full bg-white border border-red-200 px-3 py-1 text-xs font-medium text-red-700">
+                <span
+                  key={f.factorId}
+                  className="rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-700"
+                >
                   {f.factorId} — {f.fullName}
                 </span>
               ))}
@@ -108,27 +116,39 @@ export default async function ResultadoPage({
 
         {/* Gráfico */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 font-semibold text-gray-900">Score por Fator de Risco</h2>
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Score por Fator de Risco
+          </h2>
           <RiskChart data={chartData} />
         </div>
 
         {/* Ranking detalhado */}
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-gray-100 px-6 py-4">
-            <h2 className="font-semibold text-gray-900">Ranking de Fatores</h2>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-6 py-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Ranking de Fatores</h2>
           </div>
           <div className="divide-y divide-gray-100">
             {chartData.map((item, index) => {
               const factor = FACTORS.find(f => f.id === item.factorId)!
               return (
                 <div key={item.factorId} className="flex items-center gap-4 px-6 py-4">
-                  <span className="w-6 shrink-0 text-sm font-bold text-gray-300">#{index + 1}</span>
+                  <span className="w-6 shrink-0 text-sm font-bold text-gray-200">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 text-sm truncate">{factor.name}</p>
-                    <p className="text-xs text-gray-400">{factor.dimension} · {RISK_THRESHOLD[item.level]}</p>
+                    <p className="truncate text-sm font-medium text-gray-900">{factor.name}</p>
+                    <p className="text-xs text-gray-400">{factor.dimension}</p>
+                    <div className="mt-1.5 h-1 w-full rounded-full bg-gray-100">
+                      <div
+                        className={`h-1 rounded-full ${RISK_BAR[item.level]}`}
+                        style={{ width: `${item.score}%` }}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-gray-700 w-10 text-right">{item.score.toFixed(0)}</span>
+                    <span className="w-10 text-right text-sm font-bold tabular-nums text-gray-700">
+                      {item.score.toFixed(0)}
+                    </span>
                     <RiskBadge level={item.level} />
                   </div>
                 </div>
@@ -137,17 +157,17 @@ export default async function ResultadoPage({
           </div>
         </div>
 
-        {/* Próximo passo */}
+        {/* Navegação */}
         <div className="flex gap-3">
           <Link
             href={`/empresas/${id}`}
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            Voltar à empresa
+            ← Empresa
           </Link>
           <Link
             href={`/empresas/${id}/setores/${sectorId}/avaliacao/${assessmentId}/intervencoes`}
-            className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-blue-700"
+            className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
           >
             Avançar para Intervenções →
           </Link>

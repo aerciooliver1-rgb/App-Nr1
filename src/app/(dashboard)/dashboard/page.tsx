@@ -1,5 +1,6 @@
 import { Header } from '@/components/layout/Header'
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 
 async function getStats() {
   const supabase = await createClient()
@@ -21,14 +22,51 @@ async function getStats() {
   }
 }
 
+interface StatCard {
+  label: string
+  sublabel: string
+  value: number
+  href: string
+  borderColor: string
+  valueColor: string
+}
+
 export default async function DashboardPage() {
   const stats = await getStats()
 
-  const cards = [
-    { label: 'Empresas cadastradas', value: stats.companies, color: 'bg-blue-50 text-blue-700' },
-    { label: 'Avaliações concluídas', value: stats.assessments, color: 'bg-green-50 text-green-700' },
-    { label: 'Ações pendentes', value: stats.pendingActions, color: 'bg-yellow-50 text-yellow-700' },
-    { label: 'Riscos críticos', value: stats.criticalRisks, color: 'bg-red-50 text-red-700' },
+  const cards: StatCard[] = [
+    {
+      label: 'Empresas',
+      sublabel: 'cadastradas',
+      value: stats.companies,
+      href: '/empresas',
+      borderColor: 'border-t-blue-500',
+      valueColor: 'text-blue-600',
+    },
+    {
+      label: 'Avaliações',
+      sublabel: 'concluídas',
+      value: stats.assessments,
+      href: '/empresas',
+      borderColor: 'border-t-emerald-500',
+      valueColor: 'text-emerald-600',
+    },
+    {
+      label: 'Ações',
+      sublabel: 'pendentes',
+      value: stats.pendingActions,
+      href: '/empresas',
+      borderColor: 'border-t-amber-500',
+      valueColor: 'text-amber-600',
+    },
+    {
+      label: 'Riscos',
+      sublabel: 'críticos',
+      value: stats.criticalRisks,
+      href: '/empresas',
+      borderColor: 'border-t-red-500',
+      valueColor: stats.criticalRisks > 0 ? 'text-red-600' : 'text-gray-400',
+    },
   ]
 
   return (
@@ -37,12 +75,19 @@ export default async function DashboardPage() {
       <div className="p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => (
-            <div key={card.label} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <p className="text-sm font-medium text-gray-500">{card.label}</p>
-              <p className={`mt-2 text-3xl font-bold ${card.color} rounded-lg px-3 py-1 inline-block`}>
+            <Link
+              key={card.label}
+              href={card.href}
+              className={`group block rounded-xl border border-gray-200 border-t-4 bg-white px-6 py-5 shadow-sm transition-shadow hover:shadow-md ${card.borderColor}`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                {card.label}
+              </p>
+              <p className="text-xs text-gray-400">{card.sublabel}</p>
+              <p className={`mt-3 text-4xl font-bold tabular-nums ${card.valueColor}`}>
                 {card.value}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
