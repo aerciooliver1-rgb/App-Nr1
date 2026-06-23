@@ -13,8 +13,8 @@ test.describe('Acompanhamento Kanban e Lista', () => {
 
   test('Kanban exibe colunas de status', async ({ page }) => {
     await irParaAcompanhamento(page, 'Hospital São Lucas S/A')
-    await expect(page.getByText(/pendente/i)).toBeVisible()
-    await expect(page.getByText(/em andamento/i)).toBeVisible()
+    await expect(page.getByText(/pendente/i).first()).toBeVisible()
+    await expect(page.getByText(/em andamento/i).first()).toBeVisible()
   })
 
   test('toggle para visão em lista funciona', async ({ page }) => {
