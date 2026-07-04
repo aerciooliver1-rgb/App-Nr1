@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -30,30 +30,33 @@ interface Props {
   lastAssessmentDate: string | null
 }
 
-const LEVEL_COLORS: Record<RiskLevel, string> = {
-  baixo: '#16a34a',
-  moderado: '#ca8a04',
-  alto: '#ea580c',
-  critico: '#dc2626',
-}
-
 const LEVEL_BG: Record<RiskLevel, string> = {
-  baixo: 'bg-green-100 text-green-800',
+  baixo:    'bg-green-100 text-green-800',
   moderado: 'bg-yellow-100 text-yellow-800',
-  alto: 'bg-orange-100 text-orange-800',
-  critico: 'bg-red-100 text-red-800',
+  alto:     'bg-orange-100 text-orange-800',
+  critico:  'bg-red-100 text-red-800',
 }
 
-const LINE_PALETTE = [
-  '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981',
-  '#f59e0b', '#ef4444', '#ec4899', '#84cc16',
-  '#f97316', '#6366f1', '#14b8a6', '#a855f7',
-  '#eab308',
+// Uma cor por ciclo
+const CYCLE_COLORS = [
+  '#3b82f6', // azul
+  '#8b5cf6', // violeta
+  '#06b6d4', // ciano
+  '#f59e0b', // âmbar
+  '#10b981', // esmeralda
 ]
 
 type Tab = 'grafico' | 'tabela' | 'delta'
 
-function ReavaliacaoAlert({ lastDate, companyId, sectorId }: { lastDate: string | null; companyId: string; sectorId: string }) {
+function ReavaliacaoAlert({
+  lastDate,
+  companyId,
+  sectorId,
+}: {
+  lastDate: string | null
+  companyId: string
+  sectorId: string
+}) {
   if (!lastDate) return null
   const monthsAgo = (Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24 * 30)
   if (monthsAgo < 6) return null
@@ -79,20 +82,149 @@ function ReavaliacaoAlert({ lastDate, companyId, sectorId }: { lastDate: string 
   )
 }
 
-export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAssessmentId, lastAssessmentDate }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('grafico')
-  const [selectedFactors, setSelectedFactors] = useState<Set<string>>(new Set(factors.map(f => f.id)))
+// ── Tooltip customizado ────────────────────────────────────────────────────────
 
-  // Dados para o gráfico: uma linha por fator, um ponto por ciclo
-  const chartData = cycles.map(c => {
-    const row: Record<string, number | string> = { cycle: `Ciclo ${c.cycle}` }
-    for (const s of c.scores) {
-      row[s.factorId] = Math.round(s.score)
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  factors,
+}: {
+  active?: boolean
+  payload?: { name: string; value: number; color: string }[]
+  label?: string
+  factors: Factor[]
+}) {
+  if (!active || !payload?.length) return null
+  const factor = factors.find(f => f.id === label)
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+      <p className="mb-2 text-xs font-semibold text-gray-700">
+        {label} — {factor?.name ?? label}
+      </p>
+      {payload.map(p => (
+        <div key={p.name} className="flex items-center gap-2 text-xs">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: p.color }} />
+          <span className="text-gray-500">{p.name}:</span>
+          <span className="font-bold text-gray-900">{p.value}/100</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Painel de métricas de evolução ─────────────────────────────────────────────
+
+function EvolucaoStats({ cycles, factors }: { cycles: CycleData[]; factors: Factor[] }) {
+  if (cycles.length < 2) return null
+
+  const first = cycles[0]
+  const last  = cycles[cycles.length - 1]
+
+  // Duração total em meses
+  const msFirst    = new Date(first.createdAt).getTime()
+  const msLast     = new Date(last.createdAt).getTime()
+  const months     = Math.max(1, Math.round((msLast - msFirst) / (1000 * 60 * 60 * 24 * 30)))
+
+  // Score geral
+  const scoreDelta   = last.overallScore - first.overallScore
+  const scoreImproved = scoreDelta < 0
+
+  // Fatores melhorados (score menor = risco menor = melhora)
+  let improvedCount = 0
+  let comparableCount = 0
+  for (const f of factors) {
+    const prev = first.scores.find(s => s.factorId === f.id)
+    const curr = last.scores.find(s => s.factorId === f.id)
+    if (prev && curr) {
+      comparableCount++
+      if (curr.score < prev.score) improvedCount++
     }
-    return row
-  })
+  }
 
-  // Delta: comparação entre último e penúltimo ciclo
+  const firstLabel = new Date(first.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+  const lastLabel  = new Date(last.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+
+  return (
+    <div className="mt-4 grid grid-cols-3 divide-x divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+      {/* Score geral */}
+      <div className="px-5 py-4 text-center">
+        <p className="text-2xl font-bold tabular-nums text-gray-900">
+          {first.overallScore}
+          <span className="mx-1.5 text-base font-normal text-gray-300">→</span>
+          {last.overallScore}
+        </p>
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          Score Geral
+        </p>
+        <p className={`mt-1 text-xs font-semibold ${scoreImproved ? 'text-emerald-600' : scoreDelta > 0 ? 'text-red-500' : 'text-gray-400'}`}>
+          {scoreImproved ? '↓' : scoreDelta > 0 ? '↑' : '—'}
+          {scoreDelta !== 0 && ` ${Math.abs(scoreDelta)} pts`}
+          {scoreImproved ? ' (melhora)' : scoreDelta > 0 ? ' (piora)' : ' (sem variação)'}
+        </p>
+      </div>
+
+      {/* Duração */}
+      <div className="px-5 py-4 text-center">
+        <p className="text-2xl font-bold tabular-nums text-gray-900">
+          {months}{' '}
+          <span className="text-base font-normal text-gray-500">{months === 1 ? 'mês' : 'meses'}</span>
+        </p>
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          Duração entre Ciclos
+        </p>
+        <p className="mt-1 text-xs text-gray-400">
+          Ciclo #{first.cycle} ({firstLabel}) → Ciclo #{last.cycle} ({lastLabel})
+        </p>
+      </div>
+
+      {/* Fatores melhorados */}
+      <div className="px-5 py-4 text-center">
+        <p className="text-2xl font-bold tabular-nums text-emerald-700">
+          {improvedCount}
+          <span className="text-base font-normal text-gray-400">/{comparableCount}</span>
+        </p>
+        <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          Fatores Melhorados
+        </p>
+        <p className="mt-1 text-xs text-gray-400">
+          {comparableCount - improvedCount} sem melhora
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Componente principal ────────────────────────────────────────────────────────
+
+export function HistoricoClient({
+  cycles,
+  factors,
+  companyId,
+  sectorId,
+  latestAssessmentId,
+  lastAssessmentDate,
+}: Props) {
+  const [activeTab, setActiveTab] = useState<Tab>('grafico')
+  const [selectedFactors, setSelectedFactors] = useState<Set<string>>(
+    new Set(factors.map(f => f.id)),
+  )
+
+  // Dados para o gráfico de barras: um ponto por fator, uma barra por ciclo
+  const barData = factors
+    .filter(f => selectedFactors.has(f.id))
+    .map(f => {
+      const entry: Record<string, string | number> = {
+        factorId:   f.id,
+        factorName: f.name,
+      }
+      for (const c of cycles) {
+        const score = c.scores.find(s => s.factorId === f.id)
+        entry[`Ciclo ${c.cycle}`] = score ? Math.round(score.score) : 0
+      }
+      return entry
+    })
+
   const lastCycle = cycles[cycles.length - 1]
   const prevCycle = cycles.length >= 2 ? cycles[cycles.length - 2] : null
 
@@ -107,13 +239,13 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'grafico', label: 'Evolução por Ciclo' },
-    { id: 'tabela', label: 'Tabela Comparativa' },
-    { id: 'delta', label: 'Variação' },
+    { id: 'tabela',  label: 'Tabela Comparativa' },
+    { id: 'delta',   label: 'Variação' },
   ]
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Alerta de reavaliação */}
+
       <ReavaliacaoAlert lastDate={lastAssessmentDate} companyId={companyId} sectorId={sectorId} />
 
       {/* Cards resumo por ciclo */}
@@ -122,7 +254,7 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
           <a
             key={c.assessmentId}
             href={`/empresas/${companyId}/setores/${sectorId}/avaliacao/${c.assessmentId}/resultado`}
-            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300 hover:shadow-md transition-all"
+            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:border-blue-300 hover:shadow-md"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
               Ciclo #{c.cycle}
@@ -158,10 +290,11 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
         </div>
 
         <div className="p-5">
-          {/* Tab: Gráfico */}
+
+          {/* ── Tab: Evolução por Ciclo ──────────────────────────────── */}
           {activeTab === 'grafico' && (
             <div>
-              {/* Seletor de fatores */}
+              {/* Filtro de fatores */}
               <div className="mb-4 flex flex-wrap gap-2">
                 <button
                   onClick={() => setSelectedFactors(new Set(factors.map(f => f.id)))}
@@ -175,58 +308,86 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                 >
                   Nenhum
                 </button>
-                {factors.map((f, i) => (
+                {factors.map(f => (
                   <button
                     key={f.id}
                     onClick={() => toggleFactor(f.id)}
                     title={f.name}
                     className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                       selectedFactors.has(f.id)
-                        ? 'text-white'
-                        : 'bg-gray-100 text-gray-500'
+                        ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                     }`}
-                    style={selectedFactors.has(f.id) ? { backgroundColor: LINE_PALETTE[i % LINE_PALETTE.length] } : undefined}
                   >
                     {f.id}
                   </button>
                 ))}
               </div>
 
-              <ResponsiveContainer width="100%" height={380}>
-                <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="cycle" tick={{ fontSize: 12 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={v => `${v}`} />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const factor = factors.find(f => f.id === name)
-                      return [`${value}/100`, factor?.name ?? name]
-                    }}
-                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                  />
-                  <ReferenceLine y={25} stroke="#16a34a" strokeDasharray="4 2" label={{ value: 'Baixo', position: 'right', fontSize: 10, fill: '#16a34a' }} />
-                  <ReferenceLine y={50} stroke="#ca8a04" strokeDasharray="4 2" label={{ value: 'Moderado', position: 'right', fontSize: 10, fill: '#ca8a04' }} />
-                  <ReferenceLine y={75} stroke="#ea580c" strokeDasharray="4 2" label={{ value: 'Alto', position: 'right', fontSize: 10, fill: '#ea580c' }} />
-                  {factors.map((f, i) =>
-                    selectedFactors.has(f.id) ? (
-                      <Line
-                        key={f.id}
-                        type="monotone"
-                        dataKey={f.id}
-                        stroke={LINE_PALETTE[i % LINE_PALETTE.length]}
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                        activeDot={{ r: 6 }}
-                        name={f.id}
-                      />
-                    ) : null,
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
+              {/* Legenda de ciclos */}
+              <div className="mb-3 flex flex-wrap gap-3">
+                {cycles.map((c, i) => (
+                  <div key={c.cycle} className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <span
+                      className="h-3 w-3 rounded-sm"
+                      style={{ backgroundColor: CYCLE_COLORS[i % CYCLE_COLORS.length] }}
+                    />
+                    Ciclo {c.cycle} · {new Date(c.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                  </div>
+                ))}
+              </div>
+
+              {/* Gráfico de barras agrupadas — scroll horizontal em telas pequenas */}
+              <div className="overflow-x-auto">
+                <div style={{ minWidth: Math.max(600, selectedFactors.size * 60) }}>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart
+                      data={barData}
+                      margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+                      barCategoryGap="25%"
+                      barGap={2}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="factorId" tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94a3b8' }} width={32} />
+                      <Tooltip content={<CustomTooltip factors={factors} />} />
+                      <ReferenceLine y={25} stroke="#16a34a" strokeDasharray="4 2" strokeOpacity={0.5} />
+                      <ReferenceLine y={50} stroke="#ca8a04" strokeDasharray="4 2" strokeOpacity={0.5} />
+                      <ReferenceLine y={75} stroke="#ea580c" strokeDasharray="4 2" strokeOpacity={0.5} />
+                      {cycles.map((c, i) => (
+                        <Bar
+                          key={c.cycle}
+                          dataKey={`Ciclo ${c.cycle}`}
+                          fill={CYCLE_COLORS[i % CYCLE_COLORS.length]}
+                          radius={[3, 3, 0, 0]}
+                          maxBarSize={24}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Legenda das linhas de referência */}
+              <div className="mt-2 flex flex-wrap gap-4 justify-end">
+                {[
+                  { label: 'Baixo ≤25', color: '#16a34a' },
+                  { label: 'Moderado ≤50', color: '#ca8a04' },
+                  { label: 'Alto ≤75', color: '#ea580c' },
+                ].map(r => (
+                  <div key={r.label} className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                    <span className="inline-block h-px w-4 border-t border-dashed" style={{ borderColor: r.color }} />
+                    {r.label}
+                  </div>
+                ))}
+              </div>
+
+              {/* Painel de métricas de evolução */}
+              <EvolucaoStats cycles={cycles} factors={factors} />
             </div>
           )}
 
-          {/* Tab: Tabela */}
+          {/* ── Tab: Tabela ─────────────────────────────────────────── */}
           {activeTab === 'tabela' && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -249,7 +410,7 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                       </td>
                       {cycles.map(c => {
                         const score = c.scores.find(s => s.factorId === f.id)
-                        if (!score) return <td key={c.cycle} className="px-3 py-2 text-center text-gray-300 text-xs">—</td>
+                        if (!score) return <td key={c.cycle} className="px-3 py-2 text-center text-xs text-gray-300">—</td>
                         return (
                           <td key={c.cycle} className="px-3 py-2 text-center">
                             <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${LEVEL_BG[score.level]}`}>
@@ -260,7 +421,6 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                       })}
                     </tr>
                   ))}
-                  {/* Linha geral */}
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                     <td className="px-3 py-2 text-xs text-gray-700">Score Geral</td>
                     {cycles.map(c => (
@@ -274,7 +434,7 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
             </div>
           )}
 
-          {/* Tab: Delta */}
+          {/* ── Tab: Variação ───────────────────────────────────────── */}
           {activeTab === 'delta' && (
             <div>
               {!prevCycle ? (
@@ -284,7 +444,7 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
               ) : (
                 <div>
                   <p className="mb-4 text-sm text-gray-500">
-                    Comparando Ciclo #{prevCycle.cycle} → Ciclo #{lastCycle.cycle}
+                    Comparando Ciclo #{prevCycle.cycle} → Ciclo #{lastCycle?.cycle}
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -292,20 +452,20 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                         <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
                           <th className="px-3 py-2 text-left font-medium">Fator</th>
                           <th className="px-3 py-2 text-center font-medium">Ciclo #{prevCycle.cycle}</th>
-                          <th className="px-3 py-2 text-center font-medium">Ciclo #{lastCycle.cycle}</th>
+                          <th className="px-3 py-2 text-center font-medium">Ciclo #{lastCycle?.cycle}</th>
                           <th className="px-3 py-2 text-center font-medium">Variação</th>
                         </tr>
                       </thead>
                       <tbody>
                         {factors.map(f => {
                           const prev = prevCycle.scores.find(s => s.factorId === f.id)
-                          const curr = lastCycle.scores.find(s => s.factorId === f.id)
+                          const curr = lastCycle?.scores.find(s => s.factorId === f.id)
                           if (!prev || !curr) return null
                           const delta = Math.round(curr.score) - Math.round(prev.score)
                           return (
                             <tr key={f.id} className="border-b border-gray-50 hover:bg-gray-50">
                               <td className="px-3 py-2 text-xs text-gray-700">
-                                <span className="font-mono text-gray-400 mr-1">{f.id}</span>
+                                <span className="mr-1 font-mono text-gray-400">{f.id}</span>
                                 {f.name}
                               </td>
                               <td className="px-3 py-2 text-center">
@@ -320,7 +480,7 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                               </td>
                               <td className="px-3 py-2 text-center">
                                 <span className={`inline-flex items-center gap-0.5 text-sm font-bold ${
-                                  delta < 0 ? 'text-green-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'
+                                  delta < 0 ? 'text-emerald-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'
                                 }`}>
                                   {delta < 0 ? '↓' : delta > 0 ? '↑' : '—'}
                                   {delta !== 0 && Math.abs(delta)}
@@ -329,9 +489,8 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                             </tr>
                           )
                         })}
-                        {/* Linha geral */}
                         {(() => {
-                          const delta = lastCycle.overallScore - prevCycle.overallScore
+                          const delta = (lastCycle?.overallScore ?? 0) - prevCycle.overallScore
                           return (
                             <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                               <td className="px-3 py-2 text-xs text-gray-700">Score Geral</td>
@@ -339,11 +498,11 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                                 {prevCycle.overallScore}
                               </td>
                               <td className="px-3 py-2 text-center text-sm font-bold text-gray-900">
-                                {lastCycle.overallScore}
+                                {lastCycle?.overallScore}
                               </td>
                               <td className="px-3 py-2 text-center">
                                 <span className={`inline-flex items-center gap-0.5 text-sm font-bold ${
-                                  delta < 0 ? 'text-green-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'
+                                  delta < 0 ? 'text-emerald-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'
                                 }`}>
                                   {delta < 0 ? '↓' : delta > 0 ? '↑' : '—'}
                                   {delta !== 0 && Math.abs(delta)}
@@ -355,9 +514,8 @@ export function HistoricoClient({ cycles, factors, companyId, sectorId, latestAs
                       </tbody>
                     </table>
                   </div>
-                  <p className="mt-3 text-xs text-gray-400 italic">
-                    ↓ Redução do score = melhora. ↑ Aumento = piora.
-                    Score mede intensidade do fator de risco (0–100).
+                  <p className="mt-3 text-xs italic text-gray-400">
+                    ↓ Redução do score = melhora. ↑ Aumento = piora. Score mede intensidade do fator de risco (0–100).
                   </p>
                 </div>
               )}

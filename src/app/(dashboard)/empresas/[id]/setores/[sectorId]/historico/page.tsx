@@ -88,7 +88,12 @@ export default async function HistoricoPage({
   const companyName = sectorTyped.companies?.name ?? 'Empresa'
   const sectorName = sectorTyped.name
 
-  const latestAssessmentId = cycles[cycles.length - 1]?.assessmentId
+  // Preferir o calculado mais recente para o link de Acompanhamento
+  const latestAssessmentId =
+    [...cycles]
+      .filter(c => c.status === 'calculado')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+      ?.assessmentId ?? cycles[cycles.length - 1]?.assessmentId
 
   return (
     <>

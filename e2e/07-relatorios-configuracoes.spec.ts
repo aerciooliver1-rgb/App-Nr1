@@ -12,16 +12,16 @@ test.describe('Relatórios', () => {
 
   test('tabela de relatórios exibe as 4 empresas', async ({ page }) => {
     await page.goto('/relatorios')
-    await expect(page.locator('table').getByText('HealthTech Soluções')).toBeVisible()
-    await expect(page.locator('table').getByText('Varejo Express Ltda')).toBeVisible()
-    await expect(page.locator('table').getByText('Hospital São Lucas S/A')).toBeVisible()
-    await expect(page.locator('table').getByText('Callcenter Rápido S/A')).toBeVisible()
+    await expect(page.locator('table').getByText('HealthTech Soluções').first()).toBeVisible()
+    await expect(page.locator('table').getByText('Varejo Express Ltda').first()).toBeVisible()
+    await expect(page.locator('table').getByText('Hospital São Lucas S/A').first()).toBeVisible()
+    await expect(page.locator('table').getByText('Callcenter Rápido S/A').first()).toBeVisible()
   })
 
   test('links de exportação presentes na tabela', async ({ page }) => {
     await page.goto('/relatorios')
     await expect(page.getByRole('link', { name: /pptx/i }).first()).toBeVisible()
-    await expect(page.getByRole('link', { name: /docx/i }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: /pdf/i }).first()).toBeVisible()
   })
 })
 
@@ -30,6 +30,11 @@ test.describe('Configurações', () => {
     await page.goto('/configuracoes')
     await expect(page.getByRole('button', { name: 'Perfil' })).toBeVisible()
     await expect(page.getByText(/nome de exibição/i)).toBeVisible()
+  })
+
+  test('aba Perfil exibe campo de registro profissional', async ({ page }) => {
+    await page.goto('/configuracoes')
+    await expect(page.getByText(/registro profissional/i).first()).toBeVisible()
   })
 
   test('aba Empresa exibe formulário de dados da empresa', async ({ page }) => {

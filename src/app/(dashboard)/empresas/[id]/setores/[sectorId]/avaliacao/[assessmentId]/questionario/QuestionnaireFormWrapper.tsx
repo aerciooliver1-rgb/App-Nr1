@@ -27,7 +27,6 @@ export function QuestionnaireFormWrapper({
   }
 
   async function handleSubmit(answers: AnswerInput[], notes: Record<string, string>) {
-    // Salva todas as respostas agrupadas por fator antes de submeter
     const byFactor = new Map<string, AnswerInput[]>()
     for (const a of answers) {
       if (!byFactor.has(a.factorId)) byFactor.set(a.factorId, [])
@@ -44,6 +43,8 @@ export function QuestionnaireFormWrapper({
       assessmentId={assessmentId}
       mode="A"
       isAdmin
+      initialAnswers={existingAnswers}
+      initialNotes={existingNotes}
       onSaveFactor={handleSaveFactor}
       onSubmit={handleSubmit}
     />

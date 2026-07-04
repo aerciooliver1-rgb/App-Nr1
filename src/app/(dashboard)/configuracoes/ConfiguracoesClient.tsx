@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useState, useTransition } from 'react'
+import { useActionState, useState, useTransition, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
+import { useSearchParams } from 'next/navigation'
 import {
   updateProfile,
   updatePassword,
@@ -15,12 +16,12 @@ import {
   revokeUser,
 } from '@/app/actions/users'
 import type { UserFormState, ManagedUser } from '@/app/actions/users'
-import type { CompanyOption } from './page'
+import type { CompanyOption, SubscriptionData } from './page'
 import type { UserRole } from '@/types/database'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
-type Tab = 'perfil' | 'empresa' | 'usuarios'
+type Tab = 'perfil' | 'empresa' | 'usuarios' | 'plano'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
@@ -57,7 +58,7 @@ function ErrorBanner({ message }: { message: string }) {
 
 // ─── Aba Perfil ───────────────────────────────────────────────────────────────
 
-function PerfilTab({ userName, userEmail }: { userName: string; userEmail: string }) {
+function PerfilTab({ userName, userEmail, userRegistry }: { userName: string; userEmail: string; userRegistry: string }) {
   const [profileState, profileAction] = useActionState<SettingsFormState, FormData>(updateProfile, undefined)
   const [passwordState, passwordAction] = useActionState<SettingsFormState, FormData>(updatePassword, undefined)
 
@@ -66,7 +67,7 @@ function PerfilTab({ userName, userEmail }: { userName: string; userEmail: strin
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Dados do Perfil</h3>
 
-        {profileState?.success && <SuccessBanner message="Nome atualizado com sucesso." />}
+        {profileState?.success && <SuccessBanner message="Perfil atualizado com sucesso." />}
         {profileState?.error && <ErrorBanner message={profileState.error} />}
 
         <form action={profileAction} className="mt-3 space-y-4">
@@ -78,6 +79,18 @@ function PerfilTab({ userName, userEmail }: { userName: string; userEmail: strin
               required
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Registro Profissional (CRP / CBO)</label>
+            <input
+              name="registro_profissional"
+              defaultValue={userRegistry}
+              placeholder="Ex: CRP 21/12345 ou CBO 2515-40"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Aparece nos relatórios PDF e PPTX gerados como responsável pela elaboração.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-700">E-mail</label>
@@ -385,27 +398,223 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
   )
 }
 
+// ─── Aba Plano ───────────────────────────────────────────────────────────────
+
+const PLAN_CONFIG: Record<string, {
+  label: string
+  color: string
+  chip: string
+}> = {
+  trial:     { label: 'Trial',     color: 'border-t-gray-400',    chip: 'bg-gray-100 text-gray-700' },
+  mensal:    { label: 'Mensal',    color: 'border-t-blue-500',    chip: 'bg-blue-100 text-blue-700' },
+  semestral: { label: 'Semestral', color: 'border-t-violet-500',  chip: 'bg-violet-100 text-violet-700' },
+  anual:     { label: 'Anual',     color: 'border-t-emerald-500', chip: 'bg-emerald-100 text-emerald-700' },
+}
+
+const PLANS = [
+  {
+    id: 'mensal',
+    name: 'Mensal',
+    price: 'R$600',
+    period: '/mês',
+    limit: '300',
+    perUnit: 'R$2,00/avaliação',
+    highlight: false,
+    description: 'Ideal para profissionais em início de carteira de clientes.',
+  },
+  {
+    id: 'semestral',
+    name: 'Semestral',
+    price: 'R$500',
+    period: '/mês',
+    total: 'R$3.000 cobrado a cada 6 meses',
+    limit: '3.000',
+    perUnit: 'R$1,00/avaliação',
+    highlight: true,
+    description: 'Melhor custo-benefício para consultores ativos.',
+  },
+  {
+    id: 'anual',
+    name: 'Anual',
+    price: 'R$450',
+    period: '/mês',
+    total: 'R$5.400 cobrado anualmente',
+    limit: '12.000',
+    perUnit: 'R$0,45/avaliação',
+    highlight: false,
+    description: 'Para psicólogos e equipes com alto volume de diagnósticos.',
+  },
+]
+
+function PlanoTab({
+  subscription,
+  assessmentsThisMonth,
+}: {
+  subscription: SubscriptionData | null
+  assessmentsThisMonth: number
+}) {
+  const planType = subscription?.plan_type ?? 'trial'
+  const limit = subscription?.assessments_monthly_limit ?? 10
+  const used = assessmentsThisMonth
+  const pct = Math.min(100, Math.round((used / limit) * 100))
+  const cfg = PLAN_CONFIG[planType] ?? PLAN_CONFIG.trial
+  const days = subscription
+    ? Math.max(0, Math.ceil((new Date(subscription.period_end).getTime() - Date.now()) / 86_400_000))
+    : 0
+  const isNearLimit = pct >= 80
+  const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500'
+
+  return (
+    <div className="space-y-6">
+      {/* Resumo do plano atual */}
+      <div className={`rounded-xl border border-t-4 border-gray-200 bg-white p-6 shadow-sm ${cfg.color}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Plano atual</p>
+            <div className="mt-1 flex items-center gap-2">
+              <span className={`rounded-full px-3 py-0.5 text-sm font-bold ${cfg.chip}`}>
+                {cfg.label}
+              </span>
+              {planType === 'trial' && (
+                <span className="text-xs text-gray-400">modo demonstração</span>
+              )}
+            </div>
+          </div>
+          {subscription && (
+            <div className="text-right">
+              <p className="text-xs text-gray-400">Vigência</p>
+              <p className="text-sm font-semibold text-gray-700">
+                {days === 0 ? 'Expira hoje' : `${days} dia${days !== 1 ? 's' : ''} restantes`}
+              </p>
+              <p className="text-xs text-gray-400">
+                {new Date(subscription.period_start + 'T00:00:00').toLocaleDateString('pt-BR')}
+                {' até '}
+                {new Date(subscription.period_end + 'T00:00:00').toLocaleDateString('pt-BR')}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-xs font-medium text-gray-600">Avaliações este mês</p>
+            <span className={`text-sm font-bold tabular-nums ${isNearLimit ? 'text-amber-600' : 'text-gray-700'}`}>
+              {used} / {limit.toLocaleString('pt-BR')}
+            </span>
+          </div>
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div
+              className={`h-2.5 rounded-full transition-all duration-500 ${barColor}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {isNearLimit && (
+            <p className="mt-1 text-xs text-amber-600">
+              {pct >= 100
+                ? 'Limite atingido — novas avaliações estão bloqueadas'
+                : `${100 - pct}% do limite mensal restante`}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Tabela de planos */}
+      <div>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Planos disponíveis
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {PLANS.map(plan => (
+            <div
+              key={plan.id}
+              className={`relative rounded-xl border bg-white p-5 shadow-sm ${
+                plan.highlight
+                  ? 'border-violet-400 ring-2 ring-violet-200'
+                  : 'border-gray-200'
+              }`}
+            >
+              {plan.highlight && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="rounded-full bg-violet-600 px-3 py-0.5 text-xs font-bold text-white shadow-sm">
+                    Mais popular
+                  </span>
+                </div>
+              )}
+              <p className="text-sm font-bold text-gray-900">{plan.name}</p>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-gray-900">{plan.price}</span>
+                <span className="text-xs text-gray-400">{plan.period}</span>
+              </div>
+              {plan.total && (
+                <p className="mt-0.5 text-[11px] text-gray-400">{plan.total}</p>
+              )}
+              <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
+                <p className="text-xs text-gray-700">
+                  <span className="font-semibold">{plan.limit}</span> avaliações/mês
+                </p>
+                <p className="text-xs text-gray-400">{plan.perUnit}</p>
+                <p className="text-xs text-gray-400">{plan.description}</p>
+              </div>
+              {planType === plan.id ? (
+                <div className="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-center text-xs font-semibold text-gray-400">
+                  Plano atual
+                </div>
+              ) : (
+                <a
+                  href={`mailto:aerciooliver1@gmail.com?subject=Upgrade%20para%20plano%20${plan.name}&body=Olá,%20gostaria%20de%20fazer%20upgrade%20para%20o%20plano%20${plan.name}.`}
+                  className={`mt-4 block rounded-lg px-3 py-2 text-center text-xs font-semibold transition-colors ${
+                    plan.highlight
+                      ? 'bg-violet-600 text-white hover:bg-violet-700'
+                      : 'border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-600'
+                  }`}
+                >
+                  Solicitar upgrade →
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-center text-[11px] text-gray-400">
+          Planos sem fidelidade. Pagamento por transferência bancária ou PIX.
+          Entre em contato para contratar ou tirar dúvidas.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Container principal ──────────────────────────────────────────────────────
 
 export function ConfiguracoesClient({
   userName,
   userEmail,
+  userRegistry,
   companies,
   isAdmin,
   initialUsers,
+  subscription,
+  assessmentsThisMonth,
 }: {
   userName: string
   userEmail: string
+  userRegistry: string
   companies: CompanyOption[]
   isAdmin: boolean
   initialUsers: ManagedUser[]
+  subscription: SubscriptionData | null
+  assessmentsThisMonth: number
 }) {
-  const [tab, setTab] = useState<Tab>('perfil')
+  const searchParams = useSearchParams()
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab')
+    return (t === 'plano' || t === 'empresa' || t === 'usuarios' || t === 'perfil') ? t : 'perfil'
+  })
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'perfil', label: 'Perfil' },
     { id: 'empresa', label: 'Empresa' },
     ...(isAdmin ? [{ id: 'usuarios' as Tab, label: 'Usuários' }] : []),
+    { id: 'plano', label: 'Plano' },
   ]
 
   return (
@@ -426,9 +635,12 @@ export function ConfiguracoesClient({
         ))}
       </div>
 
-      {tab === 'perfil' && <PerfilTab userName={userName} userEmail={userEmail} />}
+      {tab === 'perfil' && <PerfilTab userName={userName} userEmail={userEmail} userRegistry={userRegistry} />}
       {tab === 'empresa' && <EmpresaTab companies={companies} />}
       {tab === 'usuarios' && isAdmin && <UsuariosTab initialUsers={initialUsers} />}
+      {tab === 'plano' && (
+        <PlanoTab subscription={subscription} assessmentsThisMonth={assessmentsThisMonth} />
+      )}
     </div>
   )
 }

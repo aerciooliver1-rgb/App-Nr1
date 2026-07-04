@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { FACTORS, SCALE_LABELS } from '@/lib/data/questions'
 import type { AnswerInput } from '@/app/actions/assessments'
 
@@ -8,6 +8,8 @@ interface Props {
   assessmentId: string
   mode: 'A' | 'B'
   isAdmin?: boolean
+  initialAnswers?: Record<string, number>
+  initialNotes?: Record<string, string>
   onSaveFactor?: (answers: AnswerInput[], note?: string) => Promise<{ error?: string }>
   onSubmit: (answers: AnswerInput[], notes: Record<string, string>) => Promise<void>
   showAnonymityReminder?: boolean
@@ -17,22 +19,58 @@ export function QuestionnaireForm({
   assessmentId,
   mode,
   isAdmin = false,
+  initialAnswers = {},
+  initialNotes = {},
   onSaveFactor,
   onSubmit,
   showAnonymityReminder = false,
 }: Props) {
-  const [factorIndex, setFactorIndex] = useState(0)
-  const [answers, setAnswers] = useState<Record<string, number>>({})
-  const [notes, setNotes] = useState<Record<string, string>>({})
+  // Start on the first unanswered factor when resuming
+  const firstUnanswered = FACTORS.findIndex(f =>
+    f.questions.some(q => initialAnswers[q.id] === undefined)
+  )
+  const [factorIndex, setFactorIndex] = useState(firstUnanswered >= 0 ? firstUnanswered : 0)
+  const [answers, setAnswers] = useState<Record<string, number>>(initialAnswers)
+  const [notes, setNotes] = useState<Record<string, string>>(initialNotes)
   const [phase, setPhase] = useState<'questionnaire' | 'review'>('questionnaire')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [focusedQId, setFocusedQId] = useState<string | null>(null)
+  const answerRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const currentFactor = FACTORS[factorIndex]
   const totalAnswered = Object.keys(answers).length
   const totalQuestions = FACTORS.reduce((sum, f) => sum + f.questions.length, 0)
 
   const currentFactorComplete = currentFactor.questions.every(q => answers[q.id] !== undefined)
+
+  // Auto-focus first unanswered question when factor changes
+  useEffect(() => {
+    const first = currentFactor.questions.find(q => answers[q.id] === undefined)
+    setFocusedQId(first?.id ?? currentFactor.questions[0]?.id ?? null)
+  }, [factorIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyboard handler: 1-5 answers focused question, advance focus
+  useEffect(() => {
+    if (phase !== 'questionnaire') return
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
+      const val = parseInt(e.key)
+      if (val >= 1 && val <= 5 && focusedQId) {
+        handleAnswer(focusedQId, val)
+        // Focus next unanswered question
+        const idx = currentFactor.questions.findIndex(q => q.id === focusedQId)
+        const next = currentFactor.questions.slice(idx + 1).find(q => answers[q.id] === undefined && q.id !== focusedQId)
+          ?? currentFactor.questions.slice(idx + 1)[0]
+        if (next) {
+          setFocusedQId(next.id)
+          answerRefs.current[next.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phase, focusedQId, currentFactor, answers]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleAnswer(questionId: string, value: number) {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
@@ -152,10 +190,10 @@ export function QuestionnaireForm({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Progresso */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      {/* Progresso — sticky */}
+      <div className="sticky top-0 z-10 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-2 flex justify-between text-sm text-gray-500">
-          <span>Fator {factorIndex + 1} de {FACTORS.length}</span>
+          <span className="font-medium text-gray-700">Fator {factorIndex + 1} de {FACTORS.length}</span>
           <span>{totalAnswered} de {totalQuestions} questões respondidas</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
@@ -163,6 +201,27 @@ export function QuestionnaireForm({
             className="h-2 rounded-full bg-blue-500 transition-all"
             style={{ width: `${(totalAnswered / totalQuestions) * 100}%` }}
           />
+        </div>
+        {/* Factor dots */}
+        <div className="mt-3 flex gap-1.5 flex-wrap">
+          {FACTORS.map((f, i) => {
+            const done = f.questions.every(q => answers[q.id] !== undefined)
+            const active = i === factorIndex
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFactorIndex(i)}
+                title={`${f.id} — ${f.name}`}
+                className={`h-2.5 rounded-full transition-all ${
+                  active
+                    ? 'w-6 bg-blue-600'
+                    : done
+                    ? 'w-2.5 bg-blue-300 hover:bg-blue-400'
+                    : 'w-2.5 bg-gray-200 hover:bg-gray-300'
+                }`}
+              />
+            )
+          })}
         </div>
       </div>
 
@@ -182,19 +241,32 @@ export function QuestionnaireForm({
         <p className="mt-1 text-xs text-gray-400">Consequência: {currentFactor.consequence}</p>
       </div>
 
+      {/* Keyboard hint */}
+      <p className="text-center text-xs text-gray-400">
+        Pressione <kbd className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 font-mono text-[10px]">1</kbd>–<kbd className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 font-mono text-[10px]">5</kbd> para responder a questão destacada
+      </p>
+
       {/* Questões */}
       {currentFactor.questions.map(q => {
         const scaleLabels = SCALE_LABELS[q.scale]
         const selected = answers[q.id]
+        const isFocused = focusedQId === q.id
 
         return (
-          <div key={q.id} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div
+            key={q.id}
+            ref={el => { answerRefs.current[q.id] = el }}
+            onClick={() => setFocusedQId(q.id)}
+            className={`rounded-xl border bg-white p-6 shadow-sm cursor-pointer transition-all ${
+              isFocused ? 'border-blue-400 ring-2 ring-blue-100' : 'border-gray-200'
+            }`}
+          >
             <p className="mb-4 text-sm font-medium text-gray-800">{q.text}</p>
             <div className="grid grid-cols-5 gap-2">
               {[1, 2, 3, 4, 5].map(v => (
                 <button
                   key={v}
-                  onClick={() => handleAnswer(q.id, v)}
+                  onClick={e => { e.stopPropagation(); setFocusedQId(q.id); handleAnswer(q.id, v) }}
                   className={`rounded-lg border p-2 text-center transition-colors ${
                     selected === v
                       ? 'border-blue-500 bg-blue-50 text-blue-700'

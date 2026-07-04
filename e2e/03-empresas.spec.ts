@@ -21,7 +21,7 @@ test.describe('Empresas', () => {
   test('navega para histórico do setor', async ({ page }) => {
     await page.goto('/empresas')
     await page.getByText('HealthTech Soluções').click()
-    await page.getByRole('link', { name: /histórico|ver histórico/i }).click()
+    await page.getByRole('link', { name: /histórico|ver histórico/i }).first().click()
     await expect(page).toHaveURL(/historico/)
     await expect(page.getByText(/ciclo/i).first()).toBeVisible()
   })

@@ -6,7 +6,7 @@ test.describe('Resultado e Plano de Ação', () => {
   async function navegarParaResultado(page: any, nomeEmpresa: string) {
     await page.goto('/empresas')
     await page.getByText(nomeEmpresa).click()
-    await page.getByRole('link', { name: /histórico/i }).click()
+    await page.getByRole('link', { name: /histórico/i }).first().click()
     await page.getByRole('link', { name: /ciclo/i }).first().click()
     await page.waitForURL(/resultado/)
   }
@@ -25,7 +25,7 @@ test.describe('Resultado e Plano de Ação', () => {
   async function navegarParaPlano(page: any, nomeEmpresa: string) {
     await page.goto('/empresas')
     await page.getByText(nomeEmpresa).click()
-    await page.getByRole('link', { name: /histórico/i }).click()
+    await page.getByRole('link', { name: /histórico/i }).first().click()
     await page.getByRole('link', { name: /acompanhamento/i }).click()
     await page.waitForURL(/acompanhamento/)
     await page.getByRole('link', { name: /apresenta/i }).click()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useTransition, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   DndContext,
   DragEndEvent,
@@ -40,12 +40,6 @@ function EvidencePanel({ actionId, onClose }: { actionId: string; onClose: () =>
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Carrega evidências na primeira abertura
-  useState(() => {
-    getEvidences(actionId).then(list => setEvidences(list))
-  })
-
-  // Workaround: usa useCallback para carregar
   const load = useCallback(async () => {
     setLoading(true)
     const list = await getEvidences(actionId)
@@ -53,8 +47,7 @@ function EvidencePanel({ actionId, onClose }: { actionId: string; onClose: () =>
     setLoading(false)
   }, [actionId])
 
-  // Carrega ao montar
-  useState(() => { load() })
+  useEffect(() => { load() }, [load])
 
   async function handleUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

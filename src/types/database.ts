@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -512,6 +514,7 @@ export type Database = {
           created_at: string | null
           full_name: string
           id: string
+          registro_profissional: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string | null
         }
@@ -519,6 +522,7 @@ export type Database = {
           created_at?: string | null
           full_name: string
           id: string
+          registro_profissional?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
@@ -526,6 +530,7 @@ export type Database = {
           created_at?: string | null
           full_name?: string
           id?: string
+          registro_profissional?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
@@ -649,12 +654,54 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          assessments_monthly_limit: number
+          created_at: string
+          id: string
+          period_end: string
+          period_start: string
+          plan_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          assessments_monthly_limit?: number
+          created_at?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          plan_type?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          assessments_monthly_limit?: number
+          created_at?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          plan_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       expire_assessment_tokens: { Args: never; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
       mark_overdue_actions: { Args: never; Returns: undefined }
     }
     Enums: {
@@ -674,14 +721,147 @@ export type Database = {
   }
 }
 
-// ─── Aliases convenientes ────────────────────────────────────────────────────
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-export type UserRole = Database["public"]["Enums"]["user_role"]
-export type AssessmentMode = Database["public"]["Enums"]["assessment_mode"]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+      DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
+
+// ─── Alias de tipos derivados dos Enums ──────────────────────────────────────
+
+export type RiskLevel       = Database["public"]["Enums"]["risk_level"]
+export type ActionStatus    = Database["public"]["Enums"]["action_status"]
+export type ActionType      = Database["public"]["Enums"]["action_type"]
+export type ApprovalStatus  = Database["public"]["Enums"]["approval_status"]
+export type AssessmentMode  = Database["public"]["Enums"]["assessment_mode"]
 export type AssessmentStatus = Database["public"]["Enums"]["assessment_status"]
-export type TokenStatus = Database["public"]["Enums"]["token_status"]
-export type RiskLevel = Database["public"]["Enums"]["risk_level"]
-export type ActionStatus = Database["public"]["Enums"]["action_status"]
-export type ApprovalStatus = Database["public"]["Enums"]["approval_status"]
-export type ProgramType = Database["public"]["Enums"]["program_type"]
-export type ActionType = Database["public"]["Enums"]["action_type"]
+export type ProgramType     = Database["public"]["Enums"]["program_type"]
+export type TokenStatus     = Database["public"]["Enums"]["token_status"]
+export type UserRole        = Database["public"]["Enums"]["user_role"]
+
+export const Constants = {
+  public: {
+    Enums: {
+      action_status: ["pendente", "em_andamento", "concluida", "atrasada"],
+      action_type: ["preventiva", "corretiva"],
+      approval_status: ["aprovado", "com_ressalvas", "em_revisao"],
+      assessment_mode: ["A", "B"],
+      assessment_status: ["rascunho", "em_coleta", "concluido", "calculado"],
+      program_type: ["padrao", "personalizado"],
+      risk_level: ["baixo", "moderado", "alto", "critico"],
+      token_status: ["ativo", "expirado", "encerrado"],
+      user_role: ["admin", "colaborador", "visualizador"],
+    },
+  },
+} as const

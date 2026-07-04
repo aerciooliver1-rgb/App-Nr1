@@ -15,6 +15,25 @@ const modeASchema = z.object({
   company_id: z.string().uuid(),
 })
 
+async function checkAssessmentQuota(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+
+  const [{ data: sub }, { count: used }] = await Promise.all([
+    supabase.from('subscriptions').select('assessments_monthly_limit').eq('user_id', userId).maybeSingle(),
+    supabase.from('assessments').select('id', { count: 'exact', head: true })
+      .eq('created_by', userId)
+      .gte('created_at', monthStart.toISOString()),
+  ])
+
+  const limit = sub?.assessments_monthly_limit ?? 10
+  if ((used ?? 0) >= limit) {
+    return `Limite de ${limit} avaliações/mês atingido. Acesse Configurações → Plano para fazer upgrade.`
+  }
+  return null
+}
+
 export async function createAssessmentModeA(
   state: AssessmentState,
   formData: FormData,
@@ -22,6 +41,9 @@ export async function createAssessmentModeA(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { message: 'Não autorizado.' }
+
+  const quotaError = await checkAssessmentQuota(supabase, user.id)
+  if (quotaError) return { message: quotaError }
 
   const validated = modeASchema.safeParse(Object.fromEntries(formData))
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
@@ -54,6 +76,9 @@ export async function createAssessmentModeB(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { message: 'Não autorizado.' }
+
+  const quotaError = await checkAssessmentQuota(supabase, user.id)
+  if (quotaError) return { message: quotaError }
 
   const validated = modeBSchema.safeParse(Object.fromEntries(formData))
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors }

@@ -70,26 +70,22 @@ export default async function ApresentacaoPage({
 
   return (
     <>
-      <Header title={`Apresentação — ${sectorName}`} />
-      <div className="p-6">
-        <div className="mx-auto max-w-4xl">
-          <ApresentacaoClient
-            assessmentId={assessmentId}
-            planId={plan.id}
-            planStatus={plan.status}
-            companyId={id}
-            sectorId={sectorId}
-            companyName={companyName}
-            sectorName={sectorName}
-            assessmentMode={assessment.mode}
-            assessmentCycle={assessment.cycle}
-            overallScore={overallScore}
-            worstLevel={worstLevel}
-            scores={enrichedScores}
-            approvals={approvals}
-          />
-        </div>
-      </div>
+      <Header title="Apresentação" />
+      <ApresentacaoClient
+        assessmentId={assessmentId}
+        planId={plan.id}
+        planStatus={plan.status}
+        companyId={id}
+        sectorId={sectorId}
+        companyName={companyName}
+        sectorName={sectorName}
+        assessmentMode={assessment.mode}
+        assessmentCycle={assessment.cycle}
+        overallScore={overallScore}
+        worstLevel={worstLevel}
+        scores={enrichedScores}
+        approvals={approvals}
+      />
     </>
   )
 }

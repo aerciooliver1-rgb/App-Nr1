@@ -19,11 +19,24 @@ export async function updateProfile(
   formData: FormData,
 ): Promise<SettingsFormState> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.' }
+
   const name = (formData.get('name') as string)?.trim()
   if (!name) return { error: 'Informe o nome.' }
 
-  const { error } = await supabase.auth.updateUser({ data: { name } })
-  if (error) return { error: error.message }
+  const registry = (formData.get('registro_profissional') as string | null)?.trim() ?? null
+
+  const [authResult, profileResult] = await Promise.all([
+    supabase.auth.updateUser({ data: { name } }),
+    supabase
+      .from('profiles')
+      .update({ full_name: name, registro_profissional: registry || null })
+      .eq('id', user.id),
+  ])
+
+  if (authResult.error) return { error: authResult.error.message }
+  if (profileResult.error) return { error: profileResult.error.message }
 
   revalidatePath('/configuracoes')
   return { success: true }

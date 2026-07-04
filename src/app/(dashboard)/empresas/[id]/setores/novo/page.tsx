@@ -39,13 +39,15 @@ export default function NovoSetorPage({ params }: { params: Promise<{ id: string
                 name="employee_count"
                 type="number"
                 min="1"
+                step="1"
+                defaultValue="1"
                 label="Total de Funcionários *"
                 placeholder="Quantidade de funcionários neste setor"
                 required
                 error={state?.errors?.employee_count?.[0]}
               />
               <p className="text-xs text-gray-400">
-                O total de funcionários é usado no Modo B (avaliação anônima) para calcular a taxa de resposta.
+                Mínimo de 1 funcionário. Obrigatório para calcular a taxa de resposta no Modo B.
               </p>
 
               <div className="flex gap-3 pt-2">

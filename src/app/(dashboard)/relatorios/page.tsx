@@ -90,17 +90,17 @@ export default async function RelatoriosPage() {
       <Header title="Relatórios" />
       <div className="p-6">
         <div className="mx-auto max-w-7xl space-y-6">
-          {/* Cards */}
+          {/* Cards de métricas */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: 'Empresas avaliadas', value: stats.companies, color: 'text-blue-700' },
-              { label: 'Setores avaliados', value: stats.sectors, color: 'text-purple-700' },
-              { label: 'Avaliações concluídas', value: stats.assessments, color: 'text-green-700' },
-              { label: 'Fatores críticos', value: stats.criticalRisks, color: 'text-red-700' },
+              { label: 'Empresas avaliadas',    value: stats.companies,    stripe: 'border-t-blue-500',    num: 'text-blue-700' },
+              { label: 'Setores avaliados',      value: stats.sectors,      stripe: 'border-t-purple-500',  num: 'text-purple-700' },
+              { label: 'Avaliações concluídas',  value: stats.assessments,  stripe: 'border-t-emerald-500', num: 'text-emerald-700' },
+              { label: 'Fatores críticos',       value: stats.criticalRisks, stripe: 'border-t-red-500',    num: 'text-red-700' },
             ].map(s => (
-              <div key={s.label} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <p className="text-xs text-gray-400">{s.label}</p>
-                <p className={`mt-1 text-3xl font-bold ${s.color}`}>{s.value}</p>
+              <div key={s.label} className={`rounded-xl border border-gray-200 border-t-4 bg-white p-5 shadow-sm ${s.stripe}`}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
+                <p className={`mt-2 text-4xl font-bold tabular-nums ${s.num}`}>{s.value}</p>
               </div>
             ))}
           </div>

@@ -6,6 +6,8 @@ import { RiskBadge } from '@/components/features/RiskBadge'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
+import { HistoricoTable } from './HistoricoTable'
+import type { AssessmentRow } from './HistoricoTable'
 
 async function getCompany(id: string) {
   const supabase = await createClient()
@@ -17,7 +19,8 @@ async function getCompany(id: string) {
         id, name, employee_count, created_at,
         assessments(
           id, status, cycle, created_at,
-          risk_scores(factor_id, score, level)
+          risk_scores(factor_id, score, level),
+          action_plans(id, status)
         )
       )
     `)
@@ -98,9 +101,14 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
         {/* Dados da empresa */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
-            Dados Cadastrais
-          </h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
+              Dados Cadastrais
+            </h2>
+            <Link href={`/empresas/${id}/editar`}>
+              <Button size="sm" variant="secondary">Editar</Button>
+            </Link>
+          </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm lg:grid-cols-3">
             <div>
               <dt className="text-xs text-gray-400">CNPJ</dt>
@@ -185,6 +193,9 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
                           Iniciar Avaliação
                         </Button>
                       </Link>
+                      <Link href={`/empresas/${id}/setores/${sector.id}/editar`}>
+                        <Button size="sm" variant="secondary">Editar</Button>
+                      </Link>
                       {sector.assessments.length > 0 && (
                         <Link href={`/empresas/${id}/setores/${sector.id}/historico`}>
                           <Button size="sm" variant="secondary">Histórico</Button>
@@ -204,51 +215,30 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
             <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-400">
               Histórico de Avaliações
             </h2>
-            <div className="overflow-hidden rounded-lg border border-gray-100">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left">
-                    <th className="px-4 py-3 font-medium text-gray-400 text-xs uppercase tracking-wide">Setor</th>
-                    <th className="px-4 py-3 font-medium text-gray-400 text-xs uppercase tracking-wide">Ciclo</th>
-                    <th className="px-4 py-3 font-medium text-gray-400 text-xs uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-3 font-medium text-gray-400 text-xs uppercase tracking-wide">Data</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {company.sectors.flatMap(s =>
-                    s.assessments.map(a => ({ ...a, sectorName: s.name, sectorId: s.id }))
-                  ).sort((a, b) =>
-                    new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
-                  ).map(a => (
-                    <tr key={a.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-700">{a.sectorName}</td>
-                      <td className="px-4 py-3 text-gray-400">#{a.cycle}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          a.status === 'calculado'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {a.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400">{formatDate(a.created_at)}</td>
-                      <td className="px-4 py-3 text-right">
-                        {a.status === 'calculado' && (
-                          <Link
-                            href={`/empresas/${id}/setores/${a.sectorId}/avaliacao/${a.id}/resultado`}
-                            className="text-xs font-medium text-blue-600 hover:underline"
-                          >
-                            Ver resultado →
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p className="mb-4 text-xs text-gray-400">
+              Clique em uma avaliação para acessar as etapas disponíveis.
+            </p>
+            <HistoricoTable
+              companyId={id}
+              rows={company.sectors.flatMap(s =>
+                s.assessments.map(a => ({
+                  id: a.id,
+                  sectorId: s.id,
+                  sectorName: s.name,
+                  cycle: a.cycle,
+                  status: a.status,
+                  created_at: a.created_at,
+                  actionPlan: (() => {
+                    const ap = a.action_plans
+                    if (!ap) return null
+                    if (Array.isArray(ap)) return (ap as { id: string; status: string }[])[0] ?? null
+                    return ap as { id: string; status: string }
+                  })(),
+                } satisfies AssessmentRow))
+              ).sort((a, b) =>
+                new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
+              )}
+            />
           </div>
         )}
       </div>

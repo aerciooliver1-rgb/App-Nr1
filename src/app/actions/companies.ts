@@ -57,7 +57,8 @@ export async function updateCompany(id: string, state: CompanyState, formData: F
   if (error) return { message: 'Erro ao atualizar empresa.' }
 
   revalidatePath(`/empresas/${id}`)
-  return { message: 'Empresa atualizada com sucesso.' }
+  revalidatePath('/empresas')
+  redirect(`/empresas/${id}`)
 }
 
 export async function createSector(companyId: string, state: CompanyState, formData: FormData): Promise<CompanyState> {
@@ -88,6 +89,28 @@ export async function updateSector(id: string, companyId: string, state: Company
 
   const { error } = await supabase.from('sectors').update(validated.data).eq('id', id)
   if (error) return { message: 'Erro ao atualizar setor.' }
+
+  revalidatePath(`/empresas/${companyId}`)
+  redirect(`/empresas/${companyId}`)
+}
+
+export async function deleteCompany(id: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('companies').delete().eq('id', id).eq('created_by', user.id)
+
+  revalidatePath('/empresas')
+  redirect('/empresas')
+}
+
+export async function deleteSector(id: string, companyId: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('sectors').delete().eq('id', id).eq('created_by', user.id)
 
   revalidatePath(`/empresas/${companyId}`)
   redirect(`/empresas/${companyId}`)
