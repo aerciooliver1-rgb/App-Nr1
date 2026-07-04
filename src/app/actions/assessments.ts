@@ -4,7 +4,21 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { calculateRiskScores } from '@/lib/calculations/risk'
+import { calculateRiskScores, countManagers, MIN_RESPONDENTS_DEFAULT } from '@/lib/calculations/risk'
+import { FACTORS } from '@/lib/data/questions'
+
+const FIRST_QUESTION_ID = FACTORS[0].questions[0].id
+
+// Conta respondentes direto no banco (evita o limite de 1000 linhas por fetch)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function countRespondentsDb(supabase: any, assessmentId: string): Promise<number> {
+  const { count } = await supabase
+    .from('assessment_answers')
+    .select('id', { count: 'exact', head: true })
+    .eq('assessment_id', assessmentId)
+    .eq('question_id', FIRST_QUESTION_ID)
+  return count ?? 0
+}
 
 export type AssessmentState = { errors?: Record<string, string[]>; message?: string } | undefined
 
@@ -114,6 +128,7 @@ export async function saveFactorAnswers(
   assessmentId: string,
   answers: AnswerInput[],
   clinicalNote?: string,
+  respondentIndex: number = 1,
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -123,18 +138,20 @@ export async function saveFactorAnswers(
 
   const factorId = answers[0].factorId
 
-  // Substitui as respostas deste fator
+  // Substitui as respostas deste fator para o respondente atual
   await supabase
     .from('assessment_answers')
     .delete()
     .eq('assessment_id', assessmentId)
     .eq('factor_id', factorId)
+    .eq('respondent_index', respondentIndex)
 
   const rows = answers.map((a, i) => ({
     assessment_id: assessmentId,
     question_id: a.questionId,
     factor_id: a.factorId,
     score: a.score,
+    respondent_index: respondentIndex,
     clinical_note: i === 0 ? (clinicalNote ?? null) : null,
   }))
 
@@ -150,10 +167,26 @@ export async function submitAssessment(
   assessmentId: string,
   companyId: string,
   sectorId: string,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; pending?: { responded: number; total: number } }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado.' }
+
+  // Modo A é respondido pelos gestores: o cálculo só conclui quando
+  // todos os gerentes responsáveis do setor tiverem respondido.
+  const { data: sector } = await supabase
+    .from('sectors')
+    .select('manager_name')
+    .eq('id', sectorId)
+    .single()
+  const managersTotal = countManagers(sector?.manager_name)
+
+  const responded = await countRespondentsDb(supabase, assessmentId)
+
+  if (responded < managersTotal) {
+    revalidatePath(`/empresas/${companyId}/setores/${sectorId}/avaliacao/${assessmentId}/questionario`)
+    return { pending: { responded, total: managersTotal } }
+  }
 
   const err = await runRiskCalculation(assessmentId, supabase)
   if (err) return { error: err }
@@ -172,6 +205,12 @@ export async function closeCollection(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado.' }
+
+  // Garantia de anonimato (ISO 45003): mínimo de respondentes validado no servidor
+  const respondents = await countRespondentsDb(supabase, assessmentId)
+  if (respondents < MIN_RESPONDENTS_DEFAULT) {
+    return { error: `São necessárias ao menos ${MIN_RESPONDENTS_DEFAULT} respostas para calcular (recebidas: ${respondents}).` }
+  }
 
   await supabase
     .from('assessment_tokens')
@@ -226,11 +265,15 @@ export async function submitAnonymousAnswers(
   if (tokenRow.status !== 'ativo') return { error: 'Este link foi encerrado.' }
   if (new Date(tokenRow.expires_at) < new Date()) return { error: 'Este link expirou.' }
 
+  // Cada colaborador anônimo recebe o próximo índice de respondente
+  const nextIndex = (await countRespondentsDb(supabase, tokenRow.assessment_id)) + 1
+
   const rows = answers.map(a => ({
     assessment_id: tokenRow.assessment_id,
     question_id: a.questionId,
     factor_id: a.factorId,
     score: a.score,
+    respondent_index: nextIndex,
   }))
 
   const { error } = await supabase.from('assessment_answers').insert(rows)
@@ -243,12 +286,22 @@ export async function submitAnonymousAnswers(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runRiskCalculation(assessmentId: string, supabase: any): Promise<string | null> {
-  const { data: answers } = await supabase
-    .from('assessment_answers')
-    .select('question_id, factor_id, score')
-    .eq('assessment_id', assessmentId)
+  // Fetch paginado: coletas grandes ultrapassam o limite de 1000 linhas por página
+  const answers: { question_id: string; factor_id: string; score: number }[] = []
+  const PAGE = 1000
+  for (let from = 0; ; from += PAGE) {
+    const { data: page } = await supabase
+      .from('assessment_answers')
+      .select('question_id, factor_id, score')
+      .eq('assessment_id', assessmentId)
+      .order('id')
+      .range(from, from + PAGE - 1)
+    if (!page || page.length === 0) break
+    answers.push(...page)
+    if (page.length < PAGE) break
+  }
 
-  if (!answers || answers.length === 0) return 'Nenhuma resposta encontrada para calcular.'
+  if (answers.length === 0) return 'Nenhuma resposta encontrada para calcular.'
 
   const scores = calculateRiskScores(answers)
 

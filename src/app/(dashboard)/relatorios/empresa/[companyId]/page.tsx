@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header'
 import { CompanyReportCharts } from './CompanyReportCharts'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
+import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
 
 const RISK_ORDER: Record<RiskLevel, number> = { critico: 4, alto: 3, moderado: 2, baixo: 1 }
 
@@ -24,10 +25,11 @@ async function getCompanyReport(companyId: string) {
     .select(`
       id, name, cnpj, created_at,
       sectors(
-        id, name, employee_count,
+        id, name, employee_count, manager_name,
         assessments(
           id, mode, status, cycle, created_at,
-          risk_scores(factor_id, score, level)
+          risk_scores(factor_id, score, level),
+          assessment_answers(count)
         )
       )
     `)
@@ -55,7 +57,14 @@ export default async function CompanyReportPage({
     .flatMap(sector =>
       (sector.assessments ?? [])
         .filter(a => a.status === 'calculado')
-        .map(a => ({ ...a, sectorId: sector.id, sectorName: sector.name })),
+        .map(a => ({
+          ...a,
+          sectorId: sector.id,
+          sectorName: sector.name,
+          respondentsTotal: a.mode === 'B'
+            ? (sector.employee_count ?? 0)
+            : countManagers(sector.manager_name),
+        })),
     )
     .sort((a, b) =>
       new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
@@ -93,6 +102,8 @@ export default async function CompanyReportPage({
       }))
       .filter(d => d.value > 0)
 
+    const answerCount = (a.assessment_answers as unknown as { count: number }[] | null)?.[0]?.count ?? 0
+
     return {
       assessmentId: a.id,
       sectorId: a.sectorId,
@@ -104,6 +115,8 @@ export default async function CompanyReportPage({
       overallScore,
       overallLevel: worstLevel,
       pieData,
+      respondents: respondentsFromAnswerCount(answerCount),
+      respondentsTotal: a.respondentsTotal,
     }
   })
 

@@ -6,6 +6,7 @@ import { RiskBadge } from '@/components/features/RiskBadge'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
+import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
 import { CompanyTabs } from './CompanyTabs'
 import type { AvaliacaoRow, SectorCardData, SectorScoreBar, StatusData } from './CompanyTabs'
 
@@ -34,7 +35,8 @@ async function getCompany(id: string) {
         id, name, employee_count, manager_name, created_at,
         assessments(
           id, mode, status, cycle, created_at,
-          risk_scores(factor_id, score, level)
+          risk_scores(factor_id, score, level),
+          assessment_answers(count)
         )
       )
     `)
@@ -137,6 +139,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
         const score = a.status === 'calculado' && scores.length > 0
           ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length)
           : null
+        const answerCount = (a.assessment_answers as unknown as { count: number }[] | null)?.[0]?.count ?? 0
         return {
           id: a.id,
           sectorId: sector.id,
@@ -147,6 +150,10 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
           date: a.created_at ? formatDate(a.created_at) : null,
           score,
           level: score !== null ? scoreToLevel(score) : null,
+          respondents: respondentsFromAnswerCount(answerCount),
+          respondentsTotal: a.mode === 'B'
+            ? (sector.employee_count ?? 0)
+            : countManagers(sector.manager_name),
           createdAt: a.created_at,
         }
       }),

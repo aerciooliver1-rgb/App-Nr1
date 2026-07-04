@@ -172,6 +172,7 @@ export type Database = {
           factor_id: string
           id: string
           question_id: string
+          respondent_index: number
           score: number
         }
         Insert: {
@@ -181,6 +182,7 @@ export type Database = {
           factor_id: string
           id?: string
           question_id: string
+          respondent_index?: number
           score: number
         }
         Update: {
@@ -190,6 +192,7 @@ export type Database = {
           factor_id?: string
           id?: string
           question_id?: string
+          respondent_index?: number
           score?: number
         }
         Relationships: [

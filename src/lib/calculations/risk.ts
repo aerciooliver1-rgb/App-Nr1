@@ -57,3 +57,17 @@ export function countRespondents(answers: AnswerRow[]): number {
 }
 
 export const MIN_RESPONDENTS_DEFAULT = 5
+
+export const TOTAL_QUESTIONS = FACTORS.reduce((sum, f) => sum + f.questions.length, 0)
+
+/** Nº de gerentes responsáveis a partir do campo livre (nomes separados por ·, , ou ;). */
+export function countManagers(managerName: string | null | undefined): number {
+  if (!managerName) return 1
+  const names = managerName.split(/[·,;]/).map(n => n.trim()).filter(Boolean)
+  return Math.max(names.length, 1)
+}
+
+/** Respondentes estimados a partir do total de linhas de resposta (respostas completas). */
+export function respondentsFromAnswerCount(answerCount: number): number {
+  return Math.round(answerCount / TOTAL_QUESTIONS)
+}

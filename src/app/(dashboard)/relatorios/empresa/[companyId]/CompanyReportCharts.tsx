@@ -16,6 +16,8 @@ export interface AssessmentCardData {
   overallScore: number
   overallLevel: RiskLevel
   pieData: { name: string; value: number; color: string }[]
+  respondents: number
+  respondentsTotal: number
 }
 
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number }[] }) {
@@ -42,6 +44,12 @@ function AssessmentCard({ data }: { data: AssessmentCardData }) {
           </p>
           <p className="mt-0.5 text-xs text-gray-400 group-hover:text-blue-500 transition-colors underline-offset-2 group-hover:underline">
             Ciclo #{data.cycle} · Modo {data.mode} · {data.date}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {data.mode === 'B'
+              ? `${data.respondents} de ${data.respondentsTotal} colaboradores responderam`
+              : `Respondido por ${data.respondents} de ${data.respondentsTotal} gestor${data.respondentsTotal !== 1 ? 'es' : ''}`}
+            {data.respondentsTotal > 0 && ` (${Math.round((data.respondents / data.respondentsTotal) * 100)}%)`}
           </p>
         </Link>
       </div>

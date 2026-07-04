@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/Header'
 import { RelatoriosClient } from './RelatoriosClient'
 import type { RiskLevel } from '@/types/database'
+import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
 
 const RISK_ORDER: Record<RiskLevel, number> = { critico: 4, alto: 3, moderado: 2, baixo: 1 }
 
@@ -19,6 +20,8 @@ export interface AssessmentRow {
   worstLevel: RiskLevel
   criticalCount: number
   highCount: number
+  respondents: number
+  respondentsTotal: number
 }
 
 async function getData() {
@@ -26,7 +29,7 @@ async function getData() {
 
   const { data: assessments } = await supabase
     .from('assessments')
-    .select('id, mode, cycle, created_at, status, sectors(id, name, company_id, companies(id, name))')
+    .select('id, mode, cycle, created_at, status, sectors(id, name, employee_count, manager_name, company_id, companies(id, name))')
     .eq('status', 'calculado')
     .order('created_at', { ascending: false })
 
@@ -36,11 +39,22 @@ async function getData() {
 
   const rows: AssessmentRow[] = await Promise.all(
     assessments.map(async a => {
-      const sector = a.sectors as { id: string; name: string; company_id: string; companies: { id: string; name: string } | null } | null
-      const { data: scores } = await supabase
-        .from('risk_scores')
-        .select('factor_id, score, level')
-        .eq('assessment_id', a.id)
+      const sector = a.sectors as { id: string; name: string; employee_count: number | null; manager_name: string | null; company_id: string; companies: { id: string; name: string } | null } | null
+      const [{ data: scores }, { count: answerCount }] = await Promise.all([
+        supabase
+          .from('risk_scores')
+          .select('factor_id, score, level')
+          .eq('assessment_id', a.id),
+        supabase
+          .from('assessment_answers')
+          .select('id', { count: 'exact', head: true })
+          .eq('assessment_id', a.id),
+      ])
+
+      const respondents = respondentsFromAnswerCount(answerCount ?? 0)
+      const respondentsTotal = a.mode === 'B'
+        ? (sector?.employee_count ?? 0)
+        : countManagers(sector?.manager_name)
 
       const sorted = [...(scores ?? [])].sort(
         (x, y) => (RISK_ORDER[y.level as RiskLevel] ?? 0) - (RISK_ORDER[x.level as RiskLevel] ?? 0),
@@ -63,6 +77,8 @@ async function getData() {
         worstLevel: (sorted[0]?.level ?? 'baixo') as RiskLevel,
         criticalCount: sorted.filter(s => s.level === 'critico').length,
         highCount: sorted.filter(s => s.level === 'alto').length,
+        respondents,
+        respondentsTotal,
       }
     }),
   )

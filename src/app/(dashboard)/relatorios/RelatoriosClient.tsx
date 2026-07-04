@@ -97,6 +97,9 @@ export function RelatoriosClient({ rows }: Props) {
                   Modo
                 </th>
                 <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  Respostas
+                </th>
+                <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                   Score
                 </th>
                 <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">
@@ -116,7 +119,7 @@ export function RelatoriosClient({ rows }: Props) {
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-14 text-center text-sm text-gray-400">
+                  <td colSpan={10} className="py-14 text-center text-sm text-gray-400">
                     Nenhuma avaliação encontrada.
                   </td>
                 </tr>
@@ -137,6 +140,16 @@ export function RelatoriosClient({ rows }: Props) {
                       <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">
                         {row.mode}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <span className="text-xs font-semibold tabular-nums text-gray-700">
+                        {row.respondents}/{row.respondentsTotal}
+                      </span>
+                      {row.respondentsTotal > 0 && (
+                        <span className="ml-1 text-[11px] text-gray-400">
+                          ({Math.round((row.respondents / row.respondentsTotal) * 100)}%)
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       <span className="text-base font-bold tabular-nums text-gray-900">

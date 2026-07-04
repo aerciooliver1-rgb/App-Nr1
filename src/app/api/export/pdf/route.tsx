@@ -5,6 +5,7 @@ import React from 'react'
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { FACTORS } from '@/lib/data/questions'
+import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
 import type { RiskLevel } from '@/types/database'
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
@@ -163,6 +164,7 @@ interface DocData {
   professionalName: string
   professionalRegistry: string
   managerName: string
+  responseRateLabel: string
 }
 
 // ─── Documento PDF ────────────────────────────────────────────────────────────
@@ -265,7 +267,8 @@ function DiagnosticoPDF({ d }: { d: DocData }) {
               ['Fatores críticos (score > 75)', String(d.criticalCount)],
               ['Fatores altos (score 51–75)', String(d.highCount)],
               ['Total de fatores avaliados', `${d.scores.length} de 13`],
-              ['Modo de coleta', `Modo ${d.mode} — ${d.mode === 'A' ? 'Institucional' : 'Anônima'}`],
+              ['Modo de coleta', `Modo ${d.mode} — ${d.mode === 'A' ? 'Gestores' : 'Colaboradores (anônima)'}`],
+              ['Taxa de resposta', d.responseRateLabel],
               ['Ciclo de avaliação', `#${d.cycle}`],
               ['Data de avaliação', d.dateLabel],
             ].map(([label, value], i) => (
@@ -540,15 +543,17 @@ export async function GET(request: NextRequest) {
   const [
     { data: assessment },
     { data: scores },
+    { count: answerCount },
     { data: plan },
     { data: profile },
   ] = await Promise.all([
     supabase
       .from('assessments')
-      .select('id, mode, cycle, created_at, sectors(name, companies(name, contact_name))')
+      .select('id, mode, cycle, created_at, sectors(name, employee_count, manager_name, companies(name, contact_name))')
       .eq('id', assessmentId)
       .single(),
     supabase.from('risk_scores').select('factor_id, score, level').eq('assessment_id', assessmentId),
+    supabase.from('assessment_answers').select('id', { count: 'exact', head: true }).eq('assessment_id', assessmentId),
     supabase
       .from('action_plans')
       .select('id, actions(description, responsible, due_date, type, risk_level)')
@@ -565,8 +570,18 @@ export async function GET(request: NextRequest) {
 
   const sector = assessment.sectors as {
     name: string
+    employee_count: number | null
+    manager_name: string | null
     companies: { name: string; contact_name: string | null } | null
   } | null
+
+  const respondents = respondentsFromAnswerCount(answerCount ?? 0)
+  const respondentsTotal = assessment.mode === 'B'
+    ? (sector?.employee_count ?? 0)
+    : countManagers(sector?.manager_name)
+  const responseRateLabel = respondentsTotal > 0
+    ? `${respondents} de ${respondentsTotal} ${assessment.mode === 'B' ? 'colaboradores' : 'gestor(es)'} (${Math.round((respondents / respondentsTotal) * 100)}%)`
+    : `${respondents} resposta(s)`
 
   const companyName = sector?.companies?.name ?? 'Empresa'
   const sectorName = sector?.name ?? 'Setor'
@@ -613,6 +628,7 @@ export async function GET(request: NextRequest) {
     professionalName: profile?.full_name ?? (user.user_metadata?.name as string | undefined) ?? '',
     professionalRegistry: profile?.registro_profissional ?? '',
     managerName,
+    responseRateLabel,
   }
 
   const pdfBuffer = await renderToBuffer(<DiagnosticoPDF d={docData} />)

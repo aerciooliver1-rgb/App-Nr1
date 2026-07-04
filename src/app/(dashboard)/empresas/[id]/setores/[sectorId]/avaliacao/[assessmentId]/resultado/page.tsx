@@ -5,6 +5,7 @@ import { RiskBadge } from '@/components/features/RiskBadge'
 import { RiskChart } from './RiskChart'
 import { ExportButton } from './ExportButton'
 import { FACTORS } from '@/lib/data/questions'
+import { countManagers } from '@/lib/calculations/risk'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
 
@@ -64,18 +65,25 @@ async function getResultado(assessmentId: string) {
 
   const { data: assessment } = await supabase
     .from('assessments')
-    .select('id, mode, status, cycle, created_at, sectors(name, companies(name))')
+    .select('id, mode, status, cycle, created_at, sectors(name, employee_count, manager_name, companies(name))')
     .eq('id', assessmentId)
     .single()
 
   if (!assessment || assessment.status !== 'calculado') return null
 
-  const { data: scores } = await supabase
-    .from('risk_scores')
-    .select('factor_id, score, level, calculated_at')
-    .eq('assessment_id', assessmentId)
+  const [{ data: scores }, { count: respondentCount }] = await Promise.all([
+    supabase
+      .from('risk_scores')
+      .select('factor_id, score, level, calculated_at')
+      .eq('assessment_id', assessmentId),
+    supabase
+      .from('assessment_answers')
+      .select('id', { count: 'exact', head: true })
+      .eq('assessment_id', assessmentId)
+      .eq('question_id', FACTORS[0].questions[0].id),
+  ])
 
-  return { assessment, scores: scores ?? [] }
+  return { assessment, scores: scores ?? [], respondents: respondentCount ?? 0 }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -89,9 +97,18 @@ export default async function ResultadoPage({
   const data = await getResultado(assessmentId)
   if (!data) notFound()
 
-  const { assessment, scores } = data
-  const sector = assessment.sectors as { name: string; companies: { name: string } | null } | null
+  const { assessment, scores, respondents } = data
+  const sector = assessment.sectors as {
+    name: string; employee_count: number | null; manager_name: string | null;
+    companies: { name: string } | null
+  } | null
   const empresaName = sector?.companies?.name ?? null
+
+  // Taxa de resposta: Modo B sobre colaboradores; Modo A sobre gestores
+  const denominator = assessment.mode === 'B'
+    ? (sector?.employee_count ?? 0)
+    : countManagers(sector?.manager_name)
+  const responseRate = denominator > 0 ? Math.round((respondents / denominator) * 100) : null
 
   // Chart: ordem original dos fatores (F01 → F13)
   const chartData = FACTORS.map(factor => {
@@ -152,6 +169,11 @@ export default async function ResultadoPage({
             <RiskBadge level={overallLevel} className="px-4 py-1.5 text-sm" />
             <p className="text-xs text-gray-400">
               Modo {assessment.mode} · Ciclo #{assessment.cycle}
+            </p>
+            <p className="rounded-full bg-gray-50 px-3 py-1 text-center text-xs font-medium text-gray-500">
+              {assessment.mode === 'B'
+                ? `${respondents} resposta${respondents !== 1 ? 's' : ''} de ${denominator} colaboradores${responseRate !== null ? ` · ${responseRate}% de adesão` : ''}`
+                : `Respondido por ${respondents} de ${denominator} gestor${denominator !== 1 ? 'es' : ''}`}
             </p>
             <p className="text-xs text-gray-300">{formatDate(assessment.created_at)}</p>
           </div>

@@ -57,6 +57,8 @@ export interface AvaliacaoRow {
   date: string | null
   score: number | null
   level: RiskLevel | null
+  respondents: number
+  respondentsTotal: number
 }
 
 interface Props {
@@ -330,6 +332,7 @@ function AvaliacoesTab({ avaliacoes, companyId }: { avaliacoes: AvaliacaoRow[]; 
             <th className="px-4 py-3">Ciclo</th>
             <th className="px-4 py-3">Modo</th>
             <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Respostas</th>
             <th className="px-4 py-3">Score Geral</th>
             <th className="px-4 py-3">Nível</th>
             <th className="px-4 py-3"></th>
@@ -346,6 +349,12 @@ function AvaliacoesTab({ avaliacoes, companyId }: { avaliacoes: AvaliacaoRow[]; 
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[a.status] ?? 'bg-gray-100 text-gray-600'}`}>
                   {STATUS_LABEL[a.status] ?? a.status}
                 </span>
+              </td>
+              <td className="px-4 py-3 text-xs tabular-nums text-gray-600">
+                {a.respondents}/{a.respondentsTotal}
+                {a.respondentsTotal > 0 && (
+                  <span className="text-gray-400"> ({Math.round((a.respondents / a.respondentsTotal) * 100)}%)</span>
+                )}
               </td>
               <td className="px-4 py-3 font-semibold tabular-nums text-gray-900">
                 {a.score !== null ? a.score : '—'}
