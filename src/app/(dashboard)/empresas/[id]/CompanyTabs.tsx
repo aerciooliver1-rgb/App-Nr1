@@ -42,6 +42,8 @@ export interface SectorCardData {
   employeeCount: number
   managerName: string | null
   assessmentCount: number
+  responsesTotal: number
+  modes: string[]
   lastCycle: number | null
   lastDate: string | null
   risk: RiskLevel | null
@@ -247,8 +249,15 @@ function SetoresTab({ sectors, companyId }: { sectors: SectorCardData[]; company
                   <dd className="mt-0.5 font-medium text-gray-800">{sector.employeeCount}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-gray-400">Avaliações</dt>
-                  <dd className="mt-0.5 font-medium text-gray-800">{sector.assessmentCount}</dd>
+                  <dt className="text-xs text-gray-400">Avaliações (respondidas)</dt>
+                  <dd className="mt-0.5 font-medium text-gray-800">
+                    {sector.responsesTotal}
+                    {sector.modes.length > 0 && (
+                      <span className="ml-1.5 text-xs font-normal text-gray-400">
+                        Modo {sector.modes.join(' + ')}
+                      </span>
+                    )}
+                  </dd>
                 </div>
                 <div className="col-span-2">
                   <dt className="text-xs text-gray-400">Gerente(s) Responsável(is)</dt>

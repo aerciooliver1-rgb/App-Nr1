@@ -3,6 +3,8 @@ import { Header } from '@/components/layout/Header'
 import { RelatoriosClient } from './RelatoriosClient'
 import type { RiskLevel } from '@/types/database'
 import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
+import { combineModes } from '@/lib/calculations/combine'
+import type { ModeAssessment } from '@/lib/calculations/combine'
 
 const RISK_ORDER: Record<RiskLevel, number> = { critico: 4, alto: 3, moderado: 2, baixo: 1 }
 
@@ -20,8 +22,7 @@ export interface AssessmentRow {
   worstLevel: RiskLevel
   criticalCount: number
   highCount: number
-  respondents: number
-  respondentsTotal: number
+  respostasLabel: string
 }
 
 async function getData() {
@@ -37,7 +38,8 @@ async function getData() {
     return { rows: [], stats: { companies: 0, sectors: 0, assessments: 0, criticalRisks: 0 } }
   }
 
-  const rows: AssessmentRow[] = await Promise.all(
+  // Enriquecer cada avaliação com scores e contagem de respostas
+  const enriched = await Promise.all(
     assessments.map(async a => {
       const sector = a.sectors as { id: string; name: string; employee_count: number | null; manager_name: string | null; company_id: string; companies: { id: string; name: string } | null } | null
       const [{ data: scores }, { count: answerCount }] = await Promise.all([
@@ -50,38 +52,56 @@ async function getData() {
           .select('id', { count: 'exact', head: true })
           .eq('assessment_id', a.id),
       ])
-
-      const respondents = respondentsFromAnswerCount(answerCount ?? 0)
-      const respondentsTotal = a.mode === 'B'
-        ? (sector?.employee_count ?? 0)
-        : countManagers(sector?.manager_name)
-
-      const sorted = [...(scores ?? [])].sort(
-        (x, y) => (RISK_ORDER[y.level as RiskLevel] ?? 0) - (RISK_ORDER[x.level as RiskLevel] ?? 0),
-      )
-      const overallScore = sorted.length > 0
-        ? Math.round(sorted.reduce((s, r) => s + r.score, 0) / sorted.length)
-        : 0
-
-      return {
-        id: a.id,
-        mode: a.mode,
-        cycle: a.cycle,
-        createdAt: a.created_at ?? '',
-        status: a.status,
-        companyId: sector?.company_id ?? '',
-        companyName: sector?.companies?.name ?? 'Empresa',
-        sectorId: sector?.id ?? '',
-        sectorName: sector?.name ?? 'Setor',
-        overallScore,
-        worstLevel: (sorted[0]?.level ?? 'baixo') as RiskLevel,
-        criticalCount: sorted.filter(s => s.level === 'critico').length,
-        highCount: sorted.filter(s => s.level === 'alto').length,
-        respondents,
-        respondentsTotal,
-      }
+      return { ...a, sector, scores: scores ?? [], answerCount: answerCount ?? 0 }
     }),
   )
+
+  // Uma linha por setor/ciclo: resultado COMBINADO de Modo A + Modo B
+  const groups = new Map<string, typeof enriched>()
+  for (const a of enriched) {
+    const key = `${a.sector?.id}#${a.cycle}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(a)
+  }
+
+  const rows: AssessmentRow[] = [...groups.values()].map(group => {
+    const combined = combineModes(
+      group.map(g => ({ id: g.id, mode: g.mode, created_at: g.created_at, risk_scores: g.scores })) as ModeAssessment[],
+    )!
+    const first = group[0]
+    const sector = first.sector
+
+    const partes: string[] = []
+    for (const g of group) {
+      const responded = respondentsFromAnswerCount(g.answerCount)
+      if (g.mode === 'A') {
+        partes.push(`${responded}/${countManagers(sector?.manager_name)} gest.`)
+      } else {
+        partes.push(`${responded}/${sector?.employee_count ?? 0} colab.`)
+      }
+    }
+
+    const latestDate = group.map(g => g.created_at ?? '').sort().at(-1) ?? ''
+
+    return {
+      id: combined.exportAssessmentId ?? first.id,
+      mode: combined.modes.join(' + '),
+      cycle: first.cycle,
+      createdAt: latestDate,
+      status: first.status,
+      companyId: sector?.company_id ?? '',
+      companyName: sector?.companies?.name ?? 'Empresa',
+      sectorId: sector?.id ?? '',
+      sectorName: sector?.name ?? 'Setor',
+      overallScore: combined.overallScore,
+      worstLevel: [...combined.factorScores].sort(
+        (x, y) => (RISK_ORDER[y.level] ?? 0) - (RISK_ORDER[x.level] ?? 0),
+      )[0]?.level ?? 'baixo',
+      criticalCount: combined.factorScores.filter(s => s.level === 'critico').length,
+      highCount: combined.factorScores.filter(s => s.level === 'alto').length,
+      respostasLabel: partes.join(' · '),
+    }
+  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const uniqueCompanies = new Set(rows.map(r => r.companyId)).size
   const uniqueSectors = new Set(rows.map(r => r.sectorId)).size

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/Header'
 import { ColetaPanel } from './ColetaPanel'
@@ -44,7 +45,12 @@ export default async function ColetaPage({
 
   const { assessment, tokenRow, respondents } = data
   const sector = assessment.sectors as { name: string; employee_count: number } | null
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // URL montada a partir do host da requisição: o QR Code aponta para o mesmo
+  // domínio que o navegador está usando (produção → domínio público)
+  const h = await headers()
+  const proto = h.get('x-forwarded-proto') ?? 'http'
+  const host = h.get('host') ?? 'localhost:3000'
+  const appUrl = `${proto}://${host}`
   const surveyUrl = tokenRow ? `${appUrl}/avaliacao/${tokenRow.token}` : null
 
   return (

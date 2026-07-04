@@ -6,6 +6,8 @@ import { CompanyReportCharts } from './CompanyReportCharts'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
 import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
+import { combineModes } from '@/lib/calculations/combine'
+import type { ModeAssessment } from '@/lib/calculations/combine'
 
 const RISK_ORDER: Record<RiskLevel, number> = { critico: 4, alto: 3, moderado: 2, baixo: 1 }
 
@@ -61,9 +63,8 @@ export default async function CompanyReportPage({
           ...a,
           sectorId: sector.id,
           sectorName: sector.name,
-          respondentsTotal: a.mode === 'B'
-            ? (sector.employee_count ?? 0)
-            : countManagers(sector.manager_name),
+          managerName: sector.manager_name,
+          employeeCount: sector.employee_count ?? 0,
         })),
     )
     .sort((a, b) =>
@@ -72,28 +73,22 @@ export default async function CompanyReportPage({
 
   const modes = [...new Set(allAssessments.map(a => a.mode))].sort()
 
-  // Processar dados para os cards de gráfico
-  const chartData = allAssessments.map(a => {
-    const scores = a.risk_scores ?? []
+  // Um card por setor/ciclo: resultado COMBINADO dos dois modos (gestores + colaboradores)
+  const groups = new Map<string, typeof allAssessments>()
+  for (const a of allAssessments) {
+    const key = `${a.sectorId}#${a.cycle}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(a)
+  }
 
-    const overallScore =
-      scores.length > 0
-        ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length)
-        : 0
-
-    const worstLevel = (
-      [...scores].sort(
-        (x, y) =>
-          (RISK_ORDER[y.level as RiskLevel] ?? 0) -
-          (RISK_ORDER[x.level as RiskLevel] ?? 0),
-      )[0]?.level ?? 'baixo'
-    ) as RiskLevel
+  const chartData = [...groups.values()].map(group => {
+    const combined = combineModes(group as unknown as ModeAssessment[])!
+    const first = group[0]
 
     const dist: Record<string, number> = {}
-    scores.forEach(s => {
+    combined.factorScores.forEach(s => {
       dist[s.level] = (dist[s.level] ?? 0) + 1
     })
-
     const pieData = (['critico', 'alto', 'moderado', 'baixo'] as RiskLevel[])
       .map(level => ({
         name: level.charAt(0).toUpperCase() + level.slice(1),
@@ -102,21 +97,36 @@ export default async function CompanyReportPage({
       }))
       .filter(d => d.value > 0)
 
-    const answerCount = (a.assessment_answers as unknown as { count: number }[] | null)?.[0]?.count ?? 0
+    // Linha de respostas por modo: "2 de 2 gestores · 26 de 35 colaboradores"
+    const parts: string[] = []
+    for (const a of group) {
+      const answerCount = (a.assessment_answers as unknown as { count: number }[] | null)?.[0]?.count ?? 0
+      const responded = respondentsFromAnswerCount(answerCount)
+      if (a.mode === 'A') {
+        const total = countManagers(a.managerName)
+        parts.push(`${responded} de ${total} gestor${total !== 1 ? 'es' : ''}`)
+      } else {
+        parts.push(`${responded} de ${a.employeeCount} colaboradores`)
+      }
+    }
+
+    const latestDate = group
+      .map(a => a.created_at ?? '')
+      .sort()
+      .at(-1) ?? ''
 
     return {
-      assessmentId: a.id,
-      sectorId: a.sectorId,
+      assessmentId: combined.exportAssessmentId ?? first.id,
+      sectorId: first.sectorId,
       companyId,
-      sectorName: a.sectorName,
-      cycle: a.cycle,
-      mode: a.mode,
-      date: formatDate(a.created_at ?? ''),
-      overallScore,
-      overallLevel: worstLevel,
+      sectorName: first.sectorName,
+      cycle: first.cycle,
+      mode: combined.modes.join(' + '),
+      date: formatDate(latestDate),
+      overallScore: combined.overallScore,
+      overallLevel: combined.overallLevel,
       pieData,
-      respondents: respondentsFromAnswerCount(answerCount),
-      respondentsTotal: a.respondentsTotal,
+      responseLine: parts.join(' · '),
     }
   })
 

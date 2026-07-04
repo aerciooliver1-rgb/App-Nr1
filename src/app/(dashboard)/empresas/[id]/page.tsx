@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
 import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
+import { combineModes } from '@/lib/calculations/combine'
 import { CompanyTabs } from './CompanyTabs'
 import type { AvaliacaoRow, SectorCardData, SectorScoreBar, StatusData } from './CompanyTabs'
 
@@ -73,24 +74,24 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
   const company = await getCompany(id)
   if (!company) notFound()
 
-  // ── Última avaliação calculada de cada setor (base do Status Atual) ─────────
-  const latestBySector = company.sectors.map(sector => {
-    const latest = [...sector.assessments]
-      .filter(a => a.status === 'calculado' && a.risk_scores.length > 0)
-      .sort((a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime())
-      .at(-1)
-    return { sector, latest: latest ?? null }
-  })
+  // ── Resultado combinado por setor: Modo A (gestores) + Modo B (colaboradores) ─
+  const combinedBySector = company.sectors.map(sector => ({
+    sector,
+    combined: combineModes(
+      sector.assessments.filter(a => a.status === 'calculado'),
+    ),
+  }))
 
-  const bars: SectorScoreBar[] = latestBySector
-    .filter(({ latest }) => latest !== null)
-    .map(({ sector, latest }) => {
-      const scores = latest!.risk_scores
-      const score = Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length)
-      return { sectorId: sector.id, name: sector.name, score, level: scoreToLevel(score) }
-    })
+  const bars: SectorScoreBar[] = combinedBySector
+    .filter(({ combined }) => combined !== null)
+    .map(({ sector, combined }) => ({
+      sectorId: sector.id,
+      name: sector.name,
+      score: combined!.overallScore,
+      level: combined!.overallLevel,
+    }))
 
-  const allFactorScores = latestBySector.flatMap(({ latest }) => latest?.risk_scores ?? [])
+  const allFactorScores = combinedBySector.flatMap(({ combined }) => combined?.factorScores ?? [])
   const overallScore = allFactorScores.length > 0
     ? Math.round(allFactorScores.reduce((sum, s) => sum + s.score, 0) / allFactorScores.length)
     : 0
@@ -111,20 +112,26 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
   }
 
   // ── Cards de setor ──────────────────────────────────────────────────────────
-  const sectorRisks = latestBySector.map(({ latest }) => {
-    if (!latest) return null
-    const score = Math.round(latest.risk_scores.reduce((sum, s) => sum + s.score, 0) / latest.risk_scores.length)
-    return scoreToLevel(score)
-  })
+  const sectorRisks = combinedBySector.map(({ combined }) => combined?.overallLevel ?? null)
 
   const sectorCards: SectorCardData[] = company.sectors.map((sector, i) => {
     const lastAssessment = sector.assessments.at(-1)
+    // "Avaliações" na nova terminologia = questionários respondidos
+    const responsesTotal = sector.assessments.reduce((sum, a) => {
+      const c = (a.assessment_answers as unknown as { count: number }[] | null)?.[0]?.count ?? 0
+      return sum + respondentsFromAnswerCount(c)
+    }, 0)
+    const modes = [...new Set(
+      sector.assessments.filter(a => a.status === 'calculado').map(a => a.mode),
+    )].sort()
     return {
       id: sector.id,
       name: sector.name,
       employeeCount: sector.employee_count ?? 0,
       managerName: sector.manager_name,
       assessmentCount: sector.assessments.length,
+      responsesTotal,
+      modes,
       lastCycle: lastAssessment?.cycle ?? null,
       lastDate: lastAssessment?.created_at ? formatDate(lastAssessment.created_at) : null,
       risk: sectorRisks[i],
@@ -163,7 +170,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
   // ── Métricas rápidas ────────────────────────────────────────────────────────
   const worstRisk = getWorstRisk(sectorRisks)
-  const totalAssessments = company.sectors.reduce((sum, s) => sum + s.assessments.length, 0)
+  const totalAssessments = sectorCards.reduce((sum, s) => sum + s.responsesTotal, 0)
   const lastDate = company.sectors
     .flatMap(s => s.assessments)
     .map(a => a.created_at)

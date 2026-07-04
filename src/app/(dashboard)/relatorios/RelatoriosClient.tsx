@@ -142,14 +142,9 @@ export function RelatoriosClient({ rows }: Props) {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-center">
-                      <span className="text-xs font-semibold tabular-nums text-gray-700">
-                        {row.respondents}/{row.respondentsTotal}
+                      <span className="text-xs font-semibold tabular-nums text-gray-700 whitespace-nowrap">
+                        {row.respostasLabel}
                       </span>
-                      {row.respondentsTotal > 0 && (
-                        <span className="ml-1 text-[11px] text-gray-400">
-                          ({Math.round((row.respondents / row.respondentsTotal) * 100)}%)
-                        </span>
-                      )}
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       <span className="text-base font-bold tabular-nums text-gray-900">
