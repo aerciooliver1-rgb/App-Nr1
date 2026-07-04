@@ -1,13 +1,17 @@
 import { test, expect } from '@playwright/test'
+import { abrirDiagnosticoDoSetor } from './helpers'
 
 test.use({ storageState: '.playwright/auth.json' })
 
+const SETOR_PADRAO: Record<string, string> = {
+  'Hospital São Lucas S/A': 'UTI e Pronto-Socorro',
+  'Varejo Express Ltda': 'Equipe de Vendas',
+  'HealthTech Soluções': 'Desenvolvimento de Software',
+}
+
 test.describe('Apresentação e Aprovação', () => {
   async function irParaApresentacao(page: any, empresa: string) {
-    await page.goto('/empresas')
-    await page.getByText(empresa).click()
-    await page.getByRole('tab', { name: 'Setores' }).click()
-    await page.getByRole('link', { name: /ver diagnóstico/i }).first().click()
+    await abrirDiagnosticoDoSetor(page, empresa, SETOR_PADRAO[empresa])
     await page.getByRole('link', { name: /acompanhamento/i }).click()
     await page.waitForURL(/acompanhamento/)
     await page.getByRole('link', { name: /apresenta/i }).click()
