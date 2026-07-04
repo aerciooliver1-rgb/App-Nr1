@@ -11,9 +11,10 @@ interface Props {
   sectorId: string
   currentName: string
   currentEmployeeCount: number
+  currentManagerName: string | null
 }
 
-export function EditSectorForm({ companyId, sectorId, currentName, currentEmployeeCount }: Props) {
+export function EditSectorForm({ companyId, sectorId, currentName, currentEmployeeCount, currentManagerName }: Props) {
   const updateSectorBound = updateSector.bind(null, sectorId, companyId)
   const [state, action] = useActionState(updateSectorBound, undefined)
   const [isPending, startTransition] = useTransition()
@@ -62,6 +63,15 @@ export function EditSectorForm({ companyId, sectorId, currentName, currentEmploy
           Mínimo de 1 funcionário. Este valor define o denominador da taxa de resposta no Modo B.
         </p>
       </div>
+
+      <Input
+        id="manager_name"
+        name="manager_name"
+        label="Gerente(s) Responsável(is)"
+        defaultValue={currentManagerName ?? ''}
+        placeholder="Ex: Maria Silva · João Costa"
+        error={state?.errors?.manager_name?.[0]}
+      />
 
       {currentEmployeeCount === 0 && !state?.errors?.employee_count && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

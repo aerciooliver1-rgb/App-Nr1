@@ -7,7 +7,7 @@ async function getSector(sectorId: string, companyId: string) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('sectors')
-    .select('id, name, employee_count, company_id')
+    .select('id, name, employee_count, manager_name, company_id')
     .eq('id', sectorId)
     .eq('company_id', companyId)
     .single()
@@ -34,6 +34,7 @@ export default async function EditarSetorPage({
               sectorId={sectorId}
               currentName={sector.name}
               currentEmployeeCount={sector.employee_count ?? 0}
+              currentManagerName={sector.manager_name}
             />
           </div>
         </div>

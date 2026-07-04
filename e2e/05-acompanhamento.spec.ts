@@ -6,7 +6,8 @@ test.describe('Acompanhamento Kanban e Lista', () => {
   async function irParaAcompanhamento(page: any, empresa: string) {
     await page.goto('/empresas')
     await page.getByText(empresa).click()
-    await page.getByRole('link', { name: /histórico/i }).first().click()
+    await page.getByRole('tab', { name: 'Setores' }).click()
+    await page.getByRole('link', { name: /ver diagnóstico/i }).first().click()
     await page.getByRole('link', { name: /acompanhamento/i }).click()
     await page.waitForURL(/acompanhamento/)
   }

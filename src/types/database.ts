@@ -616,6 +616,7 @@ export type Database = {
           created_by: string | null
           employee_count: number
           id: string
+          manager_name: string | null
           name: string
           updated_at: string | null
         }
@@ -625,6 +626,7 @@ export type Database = {
           created_by?: string | null
           employee_count?: number
           id?: string
+          manager_name?: string | null
           name: string
           updated_at?: string | null
         }
@@ -634,6 +636,7 @@ export type Database = {
           created_by?: string | null
           employee_count?: number
           id?: string
+          manager_name?: string | null
           name?: string
           updated_at?: string | null
         }

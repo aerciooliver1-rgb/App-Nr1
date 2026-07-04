@@ -18,6 +18,7 @@ const companySchema = z.object({
 const sectorSchema = z.object({
   name: z.string().min(2, { message: 'Nome deve ter ao menos 2 caracteres' }),
   employee_count: z.coerce.number().int().min(1, { message: 'Informe ao menos 1 funcionário' }),
+  manager_name: z.string().trim().transform(v => v || null).nullable().optional(),
 })
 
 export type CompanyState = {

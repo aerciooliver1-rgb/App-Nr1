@@ -49,6 +49,13 @@ export default function NovoSetorPage({ params }: { params: Promise<{ id: string
               <p className="text-xs text-gray-400">
                 Mínimo de 1 funcionário. Obrigatório para calcular a taxa de resposta no Modo B.
               </p>
+              <Input
+                id="manager_name"
+                name="manager_name"
+                label="Gerente(s) Responsável(is)"
+                placeholder="Ex: Maria Silva · João Costa"
+                error={state?.errors?.manager_name?.[0]}
+              />
 
               <div className="flex gap-3 pt-2">
                 <Link
