@@ -10,18 +10,12 @@ async function getData() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const monthStart = new Date()
-  monthStart.setDate(1)
-  monthStart.setHours(0, 0, 0, 0)
-
-  const [{ data: profile }, { data: companies }, users, { data: subscription }, { count: assessmentsThisMonth }] = await Promise.all([
+  const [{ data: profile }, { data: companies }, users, { data: subscription }, { data: responsesThisMonth }] = await Promise.all([
     supabase.from('profiles').select('role, full_name, registro_profissional').eq('id', user.id).single(),
     supabase.from('companies').select('id, name, logo_url').eq('created_by', user.id).order('name'),
     listUsers(),
     supabase.from('subscriptions').select('*').eq('user_id', user.id).maybeSingle(),
-    supabase.from('assessments').select('id', { count: 'exact', head: true })
-      .eq('created_by', user.id)
-      .gte('created_at', monthStart.toISOString()),
+    supabase.rpc('count_monthly_responses', { p_user_id: user.id }),
   ])
 
   const userName: string =
@@ -37,7 +31,7 @@ async function getData() {
     isAdmin: profile?.role === 'admin',
     users,
     subscription: subscription ?? null,
-    assessmentsThisMonth: assessmentsThisMonth ?? 0,
+    responsesThisMonth: responsesThisMonth ?? 0,
   }
 }
 
@@ -51,6 +45,7 @@ export interface SubscriptionData {
   plan_type: string
   status: string
   assessments_monthly_limit: number
+  responses_monthly_limit: number
   period_start: string
   period_end: string
 }
@@ -75,7 +70,7 @@ export default async function ConfiguracoesPage() {
                 isAdmin={data.isAdmin}
                 initialUsers={data.users}
                 subscription={data.subscription as SubscriptionData | null}
-                assessmentsThisMonth={data.assessmentsThisMonth}
+                responsesThisMonth={data.responsesThisMonth}
               />
             </Suspense>
           ) : (

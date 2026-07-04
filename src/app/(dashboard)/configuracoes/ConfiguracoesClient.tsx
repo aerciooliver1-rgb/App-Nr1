@@ -17,6 +17,7 @@ import {
 } from '@/app/actions/users'
 import type { UserFormState, ManagedUser } from '@/app/actions/users'
 import type { CompanyOption, SubscriptionData } from './page'
+import { PLAN_RESPONSE_LIMITS, RESPONSES_HARD_CAP, summarizeUsage } from '@/lib/billing'
 import type { UserRole } from '@/types/database'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -418,7 +419,7 @@ const PLANS = [
     price: 'R$600',
     period: '/mês',
     limit: '300',
-    perUnit: 'R$2,00/avaliação',
+    perUnit: 'R$2,00 por resposta excedente',
     highlight: false,
     description: 'Ideal para profissionais em início de carteira de clientes.',
   },
@@ -428,8 +429,8 @@ const PLANS = [
     price: 'R$500',
     period: '/mês',
     total: 'R$3.000 cobrado a cada 6 meses',
-    limit: '3.000',
-    perUnit: 'R$1,00/avaliação',
+    limit: '1.200',
+    perUnit: 'R$2,00 por resposta excedente',
     highlight: true,
     description: 'Melhor custo-benefício para consultores ativos.',
   },
@@ -439,8 +440,8 @@ const PLANS = [
     price: 'R$450',
     period: '/mês',
     total: 'R$5.400 cobrado anualmente',
-    limit: '12.000',
-    perUnit: 'R$0,45/avaliação',
+    limit: '3.000',
+    perUnit: 'R$2,00 por resposta excedente',
     highlight: false,
     description: 'Para psicólogos e equipes com alto volume de diagnósticos.',
   },
@@ -448,14 +449,15 @@ const PLANS = [
 
 function PlanoTab({
   subscription,
-  assessmentsThisMonth,
+  responsesThisMonth,
 }: {
   subscription: SubscriptionData | null
-  assessmentsThisMonth: number
+  responsesThisMonth: number
 }) {
   const planType = subscription?.plan_type ?? 'trial'
-  const limit = subscription?.assessments_monthly_limit ?? 10
-  const used = assessmentsThisMonth
+  const limit = subscription?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
+  const usage = summarizeUsage(responsesThisMonth, limit)
+  const used = usage.used
   const pct = Math.min(100, Math.round((used / limit) * 100))
   const cfg = PLAN_CONFIG[planType] ?? PLAN_CONFIG.trial
   const days = subscription
@@ -463,6 +465,7 @@ function PlanoTab({
     : 0
   const isNearLimit = pct >= 80
   const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500'
+  const capPct = Math.min(100, Math.round((used / RESPONSES_HARD_CAP) * 100))
 
   return (
     <div className="space-y-6">
@@ -497,9 +500,9 @@ function PlanoTab({
 
         <div className="mt-5">
           <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-600">Avaliações este mês</p>
+            <p className="text-xs font-medium text-gray-600">Respostas este mês</p>
             <span className={`text-sm font-bold tabular-nums ${isNearLimit ? 'text-amber-600' : 'text-gray-700'}`}>
-              {used} / {limit.toLocaleString('pt-BR')}
+              {used.toLocaleString('pt-BR')} / {limit.toLocaleString('pt-BR')}
             </span>
           </div>
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
@@ -508,13 +511,43 @@ function PlanoTab({
               style={{ width: `${pct}%` }}
             />
           </div>
-          {isNearLimit && (
-            <p className="mt-1 text-xs text-amber-600">
-              {pct >= 100
-                ? 'Limite atingido — novas avaliações estão bloqueadas'
-                : `${100 - pct}% do limite mensal restante`}
-            </p>
+          <p className="mt-1 text-[11px] text-gray-400">
+            1 resposta = 1 questionário completo respondido (gestor ou colaborador).
+            O contador zera no início de cada mês.
+          </p>
+
+          {usage.excess > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-xs font-semibold text-amber-800">
+                Excedente do plano: {usage.excess.toLocaleString('pt-BR')} resposta{usage.excess !== 1 ? 's' : ''}
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700">
+                Cobrança adicional estimada: <span className="font-bold">
+                  {usage.overageBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span> (R$ 2,00 por resposta excedente, faturado no fechamento do mês)
+              </p>
+            </div>
           )}
+
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-[11px] text-gray-400">
+                Capacidade total do sistema ({RESPONSES_HARD_CAP.toLocaleString('pt-BR')} respostas/mês)
+              </p>
+              <span className="text-[11px] font-semibold tabular-nums text-gray-500">{capPct}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+              <div
+                className={`h-1.5 rounded-full ${usage.capReached ? 'bg-red-500' : 'bg-gray-300'}`}
+                style={{ width: `${capPct}%` }}
+              />
+            </div>
+            {usage.capReached && (
+              <p className="mt-1 text-xs text-red-600">
+                Teto mensal atingido — novas respostas bloqueadas até o próximo ciclo.
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -550,7 +583,7 @@ function PlanoTab({
               )}
               <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
                 <p className="text-xs text-gray-700">
-                  <span className="font-semibold">{plan.limit}</span> avaliações/mês
+                  <span className="font-semibold">{plan.limit}</span> respostas/mês
                 </p>
                 <p className="text-xs text-gray-400">{plan.perUnit}</p>
                 <p className="text-xs text-gray-400">{plan.description}</p>
@@ -576,7 +609,8 @@ function PlanoTab({
         </div>
         <p className="mt-3 text-center text-[11px] text-gray-400">
           Planos sem fidelidade. Pagamento por transferência bancária ou PIX.
-          Entre em contato para contratar ou tirar dúvidas.
+          Excedente de R$ 2,00 por resposta acima do plano, faturado no fechamento do mês.
+          Capacidade máxima: 6.000 respostas/mês. Entre em contato para contratar ou tirar dúvidas.
         </p>
       </div>
     </div>
@@ -593,7 +627,7 @@ export function ConfiguracoesClient({
   isAdmin,
   initialUsers,
   subscription,
-  assessmentsThisMonth,
+  responsesThisMonth,
 }: {
   userName: string
   userEmail: string
@@ -602,7 +636,7 @@ export function ConfiguracoesClient({
   isAdmin: boolean
   initialUsers: ManagedUser[]
   subscription: SubscriptionData | null
-  assessmentsThisMonth: number
+  responsesThisMonth: number
 }) {
   const searchParams = useSearchParams()
   const [tab, setTab] = useState<Tab>(() => {
@@ -639,7 +673,7 @@ export function ConfiguracoesClient({
       {tab === 'empresa' && <EmpresaTab companies={companies} />}
       {tab === 'usuarios' && isAdmin && <UsuariosTab initialUsers={initialUsers} />}
       {tab === 'plano' && (
-        <PlanoTab subscription={subscription} assessmentsThisMonth={assessmentsThisMonth} />
+        <PlanoTab subscription={subscription} responsesThisMonth={responsesThisMonth} />
       )}
     </div>
   )

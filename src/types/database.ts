@@ -668,6 +668,7 @@ export type Database = {
           period_end: string
           period_start: string
           plan_type: string
+          responses_monthly_limit: number
           status: string
           user_id: string
         }
@@ -678,6 +679,7 @@ export type Database = {
           period_end?: string
           period_start?: string
           plan_type?: string
+          responses_monthly_limit?: number
           status?: string
           user_id: string
         }
@@ -688,6 +690,7 @@ export type Database = {
           period_end?: string
           period_start?: string
           plan_type?: string
+          responses_monthly_limit?: number
           status?: string
           user_id?: string
         }
@@ -708,6 +711,8 @@ export type Database = {
     Functions: {
       expire_assessment_tokens: { Args: never; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
+      calculate_risk_scores_sql: { Args: { p_assessment_id: string }; Returns: undefined }
+      count_monthly_responses: { Args: { p_user_id: string }; Returns: number }
       mark_overdue_actions: { Args: never; Returns: undefined }
     }
     Enums: {
