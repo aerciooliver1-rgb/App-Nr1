@@ -43,6 +43,6 @@ test.describe('Empresas', () => {
     await page.goto('/empresas')
     await expect(page.getByText('Callcenter Rápido S/A')).toBeVisible()
     // Verifica que algum indicador de nível crítico está visível
-    await expect(page.getByText(/crítico/i)).toBeVisible()
+    await expect(page.getByText(/crítico/i).first()).toBeVisible()
   })
 })

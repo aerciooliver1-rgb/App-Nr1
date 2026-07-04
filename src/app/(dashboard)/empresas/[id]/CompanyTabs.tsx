@@ -82,7 +82,7 @@ function SectorTooltip({ active, payload }: { active?: boolean; payload?: { payl
 
 function SectorScoreChart({ data }: { data: SectorScoreBar[] }) {
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={320}>
       <BarChart data={data} margin={{ top: 8, right: 52, bottom: 8, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
         <XAxis
@@ -91,6 +91,10 @@ function SectorScoreChart({ data }: { data: SectorScoreBar[] }) {
           axisLine={false}
           tickLine={false}
           interval={0}
+          angle={-28}
+          textAnchor="end"
+          height={70}
+          tickFormatter={(name: string) => name.length > 18 ? name.slice(0, 17) + '…' : name}
         />
         <YAxis
           domain={[0, 100]}
