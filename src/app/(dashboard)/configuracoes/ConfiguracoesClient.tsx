@@ -419,7 +419,7 @@ const PLANS = [
     price: 'R$600',
     period: '/mês',
     limit: '300',
-    perUnit: 'R$2,00 por resposta excedente',
+    perUnit: 'R$2,00 por avaliação excedente',
     highlight: false,
     description: 'Ideal para profissionais em início de carteira de clientes.',
   },
@@ -430,7 +430,7 @@ const PLANS = [
     period: '/mês',
     total: 'R$3.000 cobrado a cada 6 meses',
     limit: '1.200',
-    perUnit: 'R$2,00 por resposta excedente',
+    perUnit: 'R$2,00 por avaliação excedente',
     highlight: true,
     description: 'Melhor custo-benefício para consultores ativos.',
   },
@@ -441,7 +441,7 @@ const PLANS = [
     period: '/mês',
     total: 'R$5.400 cobrado anualmente',
     limit: '3.000',
-    perUnit: 'R$2,00 por resposta excedente',
+    perUnit: 'R$2,00 por avaliação excedente',
     highlight: false,
     description: 'Para psicólogos e equipes com alto volume de diagnósticos.',
   },
@@ -500,7 +500,7 @@ function PlanoTab({
 
         <div className="mt-5">
           <div className="mb-1.5 flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-600">Respostas este mês</p>
+            <p className="text-xs font-medium text-gray-600">Avaliações este mês</p>
             <span className={`text-sm font-bold tabular-nums ${isNearLimit ? 'text-amber-600' : 'text-gray-700'}`}>
               {used.toLocaleString('pt-BR')} / {limit.toLocaleString('pt-BR')}
             </span>
@@ -512,19 +512,19 @@ function PlanoTab({
             />
           </div>
           <p className="mt-1 text-[11px] text-gray-400">
-            1 resposta = 1 questionário completo respondido (gestor ou colaborador).
+            1 avaliação = 1 questionário completo respondido (gestor ou colaborador).
             O contador zera no início de cada mês.
           </p>
 
           {usage.excess > 0 && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-xs font-semibold text-amber-800">
-                Excedente do plano: {usage.excess.toLocaleString('pt-BR')} resposta{usage.excess !== 1 ? 's' : ''}
+                Excedente do plano: {usage.excess.toLocaleString('pt-BR')} avaliaç{usage.excess !== 1 ? 'ões' : 'ão'}
               </p>
               <p className="mt-0.5 text-xs text-amber-700">
                 Cobrança adicional estimada: <span className="font-bold">
                   {usage.overageBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span> (R$ 2,00 por resposta excedente, faturado no fechamento do mês)
+                </span> (R$ 2,00 por avaliação excedente, faturado no fechamento do mês)
               </p>
             </div>
           )}
@@ -532,7 +532,7 @@ function PlanoTab({
           <div className="mt-3 border-t border-gray-100 pt-3">
             <div className="mb-1 flex items-center justify-between">
               <p className="text-[11px] text-gray-400">
-                Capacidade total do sistema ({RESPONSES_HARD_CAP.toLocaleString('pt-BR')} respostas/mês)
+                Capacidade total do sistema ({RESPONSES_HARD_CAP.toLocaleString('pt-BR')} avaliações/mês)
               </p>
               <span className="text-[11px] font-semibold tabular-nums text-gray-500">{capPct}%</span>
             </div>
@@ -544,7 +544,7 @@ function PlanoTab({
             </div>
             {usage.capReached && (
               <p className="mt-1 text-xs text-red-600">
-                Teto mensal atingido — novas respostas bloqueadas até o próximo ciclo.
+                Teto mensal atingido — novas avaliações bloqueadas até o próximo ciclo.
               </p>
             )}
           </div>
@@ -583,7 +583,7 @@ function PlanoTab({
               )}
               <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
                 <p className="text-xs text-gray-700">
-                  <span className="font-semibold">{plan.limit}</span> respostas/mês
+                  <span className="font-semibold">{plan.limit}</span> avaliações/mês
                 </p>
                 <p className="text-xs text-gray-400">{plan.perUnit}</p>
                 <p className="text-xs text-gray-400">{plan.description}</p>
@@ -609,8 +609,8 @@ function PlanoTab({
         </div>
         <p className="mt-3 text-center text-[11px] text-gray-400">
           Planos sem fidelidade. Pagamento por transferência bancária ou PIX.
-          Excedente de R$ 2,00 por resposta acima do plano, faturado no fechamento do mês.
-          Capacidade máxima: 6.000 respostas/mês. Entre em contato para contratar ou tirar dúvidas.
+          Excedente de R$ 2,00 por avaliação acima do plano, faturado no fechamento do mês.
+          Capacidade máxima: 6.000 avaliações/mês. Entre em contato para contratar ou tirar dúvidas.
         </p>
       </div>
     </div>
