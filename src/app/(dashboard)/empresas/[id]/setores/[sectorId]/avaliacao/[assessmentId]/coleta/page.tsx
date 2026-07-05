@@ -45,12 +45,19 @@ export default async function ColetaPage({
 
   const { assessment, tokenRow, respondents } = data
   const sector = assessment.sectors as { name: string; employee_count: number } | null
-  // URL montada a partir do host da requisição: o QR Code aponta para o mesmo
-  // domínio que o navegador está usando (produção → domínio público)
-  const h = await headers()
-  const proto = h.get('x-forwarded-proto') ?? 'http'
-  const host = h.get('host') ?? 'localhost:3000'
-  const appUrl = `${proto}://${host}`
+  // O link de coleta é público por natureza: colaboradores acessam de qualquer
+  // dispositivo. Sempre que a URL pública estiver configurada, o QR aponta para
+  // ela — mesmo navegando pelo ambiente local (o banco é o mesmo).
+  const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  let appUrl: string
+  if (publicUrl && !publicUrl.includes('localhost')) {
+    appUrl = publicUrl.replace(/\/$/, '')
+  } else {
+    const h = await headers()
+    const proto = h.get('x-forwarded-proto') ?? 'http'
+    const host = h.get('host') ?? 'localhost:3000'
+    appUrl = `${proto}://${host}`
+  }
   const surveyUrl = tokenRow ? `${appUrl}/avaliacao/${tokenRow.token}` : null
 
   return (
