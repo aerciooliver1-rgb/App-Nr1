@@ -47,6 +47,7 @@ export interface SectorCardData {
   lastCycle: number | null
   lastDate: string | null
   risk: RiskLevel | null
+  activeColetaId: string | null
 }
 
 export interface AvaliacaoRow {
@@ -271,6 +272,22 @@ function SetoresTab({ sectors, companyId }: { sectors: SectorCardData[]; company
                 </p>
               )}
 
+              {sector.activeColetaId && (
+                <Link
+                  href={`/empresas/${companyId}/setores/${sector.id}/avaliacao/${sector.activeColetaId}/coleta`}
+                  className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 transition-colors hover:bg-blue-100"
+                >
+                  <span className="flex items-center gap-2 text-xs font-semibold text-blue-800">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-600" />
+                    </span>
+                    Coleta em andamento
+                  </span>
+                  <span className="text-xs font-medium text-blue-700">Ver link e QR Code →</span>
+                </Link>
+              )}
+
               <div className="flex gap-2 border-t border-gray-100 pt-3">
                 {sector.assessmentCount > 0 && (
                   <Link
@@ -378,6 +395,22 @@ function AvaliacoesTab({ avaliacoes, companyId }: { avaliacoes: AvaliacaoRow[]; 
                     className="text-xs font-medium text-blue-600 hover:text-blue-700"
                   >
                     Ver Resultado →
+                  </Link>
+                )}
+                {a.status === 'em_coleta' && (
+                  <Link
+                    href={`/empresas/${companyId}/setores/${a.sectorId}/avaliacao/${a.id}/coleta`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                  >
+                    Abrir Coleta · QR Code →
+                  </Link>
+                )}
+                {a.status === 'rascunho' && (
+                  <Link
+                    href={`/empresas/${companyId}/setores/${a.sectorId}/avaliacao/${a.id}/questionario`}
+                    className="text-xs font-medium text-gray-500 hover:text-blue-700"
+                  >
+                    Continuar Questionário →
                   </Link>
                 )}
               </td>

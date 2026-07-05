@@ -124,6 +124,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
     const modes = [...new Set(
       sector.assessments.filter(a => a.status === 'calculado').map(a => a.mode),
     )].sort()
+    const activeColeta = [...sector.assessments].reverse().find(a => a.status === 'em_coleta')
     return {
       id: sector.id,
       name: sector.name,
@@ -135,6 +136,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
       lastCycle: lastAssessment?.cycle ?? null,
       lastDate: lastAssessment?.created_at ? formatDate(lastAssessment.created_at) : null,
       risk: sectorRisks[i],
+      activeColetaId: activeColeta?.id ?? null,
     }
   })
 
