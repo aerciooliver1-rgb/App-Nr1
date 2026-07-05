@@ -13,6 +13,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import type { CycleData } from './page'
+import { scoreToLevel } from '@/lib/calculations/combine'
 import type { RiskLevel } from '@/types/database'
 
 interface Factor {
@@ -46,7 +47,7 @@ const CYCLE_COLORS = [
   '#10b981', // esmeralda
 ]
 
-type Tab = 'grafico' | 'tabela' | 'delta'
+type Tab = 'grafico' | 'tabela' | 'delta' | 'divergencia'
 
 function ReavaliacaoAlert({
   lastDate,
@@ -115,7 +116,15 @@ function CustomTooltip({
 
 // ── Painel de métricas de evolução ─────────────────────────────────────────────
 
-function EvolucaoStats({ cycles, factors }: { cycles: CycleData[]; factors: Factor[] }) {
+interface CombinedCycle {
+  cycle: number
+  createdAt: string
+  modes: string[]
+  scores: { factorId: string; score: number; level: RiskLevel }[]
+  overallScore: number
+}
+
+function EvolucaoStats({ cycles, factors }: { cycles: CombinedCycle[]; factors: Factor[] }) {
   if (cycles.length < 2) return null
 
   const first = cycles[0]
@@ -174,7 +183,7 @@ function EvolucaoStats({ cycles, factors }: { cycles: CycleData[]; factors: Fact
           Duração entre Ciclos
         </p>
         <p className="mt-1 text-xs text-gray-400">
-          Ciclo #{first.cycle} ({firstLabel}) → Ciclo #{last.cycle} ({lastLabel})
+          Ciclo #{first.cycle} ({firstLabel}) → Ciclo #{last.cycle} ({lastLabel}) · resultado combinado A+B
         </p>
       </div>
 
@@ -233,6 +242,78 @@ export function HistoricoClient({
   }
   const labelOf = (c: { assessmentId: string }) => cycleLabel.get(c.assessmentId) ?? ''
 
+  // ── Ciclos combinados (A+B): base da evolução temporal ─────────────────────
+  const combinedCycles: CombinedCycle[] = (() => {
+    const byCycle = new Map<number, CycleData[]>()
+    for (const c of cycles) {
+      if (!byCycle.has(c.cycle)) byCycle.set(c.cycle, [])
+      byCycle.get(c.cycle)!.push(c)
+    }
+    return [...byCycle.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([cycle, group]) => {
+        // última avaliação de cada modo dentro do ciclo
+        const byMode = new Map<string, CycleData>()
+        for (const c of group) {
+          const cur = byMode.get(c.mode)
+          if (!cur || new Date(c.createdAt) > new Date(cur.createdAt)) byMode.set(c.mode, c)
+        }
+        const latest = [...byMode.values()]
+        const factorIds = [...new Set(latest.flatMap(c => c.scores.map(s => s.factorId)))]
+        const scores = factorIds.map(fid => {
+          const vals = latest
+            .map(c => c.scores.find(s => s.factorId === fid)?.score)
+            .filter((v): v is number => v !== undefined)
+          const score = vals.reduce((s, v) => s + v, 0) / vals.length
+          return { factorId: fid, score, level: scoreToLevel(score) }
+        })
+        const overallScore = scores.length
+          ? Math.round(scores.reduce((s, f) => s + f.score, 0) / scores.length)
+          : 0
+        return {
+          cycle,
+          createdAt: group.map(c => c.createdAt).sort().at(-1)!,
+          modes: [...byMode.keys()].sort(),
+          scores,
+          overallScore,
+        }
+      })
+  })()
+
+  // ── Divergência Gestão × Colaboradores (último ciclo com os dois modos) ────
+  const divergence = (() => {
+    const byCycle = new Map<number, CycleData[]>()
+    for (const c of cycles) {
+      if (!byCycle.has(c.cycle)) byCycle.set(c.cycle, [])
+      byCycle.get(c.cycle)!.push(c)
+    }
+    const cyclesWithBoth = [...byCycle.entries()]
+      .filter(([, group]) => new Set(group.map(c => c.mode)).size >= 2)
+      .sort(([a], [b]) => b - a)
+    if (cyclesWithBoth.length === 0) return null
+    const [cycle, group] = cyclesWithBoth[0]
+    const pick = (mode: string) => [...group]
+      .filter(c => c.mode === mode)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .at(-1)!
+    const a = pick('A')
+    const b = pick('B')
+    const rows = a.scores
+      .map(sa => {
+        const sb = b.scores.find(x => x.factorId === sa.factorId)
+        if (!sb) return null
+        return {
+          factorId: sa.factorId,
+          scoreA: Math.round(sa.score),
+          scoreB: Math.round(sb.score),
+          delta: Math.round(sa.score) - Math.round(sb.score),
+        }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+    return { cycle, a, b, rows, overallDelta: a.overallScore - b.overallScore }
+  })()
+
   // Dados para o gráfico de barras: um ponto por fator, uma barra por avaliação
   const barData = factors
     .filter(f => selectedFactors.has(f.id))
@@ -248,8 +329,8 @@ export function HistoricoClient({
       return entry
     })
 
-  const lastCycle = cycles[cycles.length - 1]
-  const prevCycle = cycles.length >= 2 ? cycles[cycles.length - 2] : null
+  const lastCycle = combinedCycles[combinedCycles.length - 1]
+  const prevCycle = combinedCycles.length >= 2 ? combinedCycles[combinedCycles.length - 2] : null
 
   function toggleFactor(factorId: string) {
     setSelectedFactors(prev => {
@@ -261,9 +342,10 @@ export function HistoricoClient({
   }
 
   const TABS: { id: Tab; label: string }[] = [
-    { id: 'grafico', label: 'Evolução por Ciclo' },
-    { id: 'tabela',  label: 'Tabela Comparativa' },
-    { id: 'delta',   label: 'Variação' },
+    { id: 'grafico',     label: 'Evolução por Ciclo' },
+    { id: 'tabela',      label: 'Tabela Comparativa' },
+    { id: 'delta',       label: 'Variação' },
+    { id: 'divergencia', label: 'Gestão × Colaboradores' },
   ]
 
   return (
@@ -406,7 +488,7 @@ export function HistoricoClient({
               </div>
 
               {/* Painel de métricas de evolução */}
-              <EvolucaoStats cycles={cycles} factors={factors} />
+              <EvolucaoStats cycles={combinedCycles} factors={factors} />
             </div>
           )}
 
@@ -462,12 +544,13 @@ export function HistoricoClient({
             <div>
               {!prevCycle ? (
                 <p className="py-12 text-center text-sm text-gray-400">
-                  São necessários ao menos 2 ciclos para comparar variações.
+                  São necessários ao menos 2 ciclos completos para comparar variações no tempo.
+                  A comparação entre Modo A e Modo B do mesmo ciclo está na aba “Gestão × Colaboradores”.
                 </p>
               ) : (
                 <div>
                   <p className="mb-4 text-sm text-gray-500">
-                    Comparando Ciclo #{prevCycle.cycle} → Ciclo #{lastCycle?.cycle}
+                    Comparando Ciclo #{prevCycle.cycle} → Ciclo #{lastCycle?.cycle} (resultado combinado A+B)
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -539,6 +622,120 @@ export function HistoricoClient({
                   </div>
                   <p className="mt-3 text-xs italic text-gray-400">
                     ↓ Redução do score = melhora. ↑ Aumento = piora. Score mede intensidade do fator de risco (0–100).
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Tab: Gestão × Colaboradores ─────────────────────────── */}
+          {activeTab === 'divergencia' && (
+            <div>
+              {!divergence ? (
+                <p className="py-12 text-center text-sm text-gray-400">
+                  Este setor ainda não tem um ciclo com os dois modos aplicados
+                  (Modo A — gestores e Modo B — colaboradores).
+                </p>
+              ) : (
+                <div>
+                  {/* Resumo */}
+                  <div className="mb-5 grid grid-cols-3 divide-x divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-2xl font-bold tabular-nums text-blue-600">{divergence.a.overallScore}</p>
+                      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        Gestores (Modo A)
+                      </p>
+                    </div>
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-2xl font-bold tabular-nums text-violet-600">{divergence.b.overallScore}</p>
+                      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        Colaboradores (Modo B)
+                      </p>
+                    </div>
+                    <div className="px-5 py-4 text-center">
+                      <p className={`text-2xl font-bold tabular-nums ${
+                        Math.abs(divergence.overallDelta) < 5 ? 'text-emerald-600'
+                        : divergence.overallDelta < 0 ? 'text-amber-600' : 'text-blue-700'
+                      }`}>
+                        {divergence.overallDelta > 0 ? '+' : ''}{divergence.overallDelta}
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        Divergência Geral
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {Math.abs(divergence.overallDelta) < 5
+                          ? 'Percepções alinhadas'
+                          : divergence.overallDelta < 0
+                            ? 'Colaboradores percebem mais risco'
+                            : 'Gestão percebe mais risco'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mb-3 text-sm text-gray-500">
+                    Ciclo #{divergence.cycle} · fatores ordenados pela maior divergência entre a
+                    percepção da gestão e a dos colaboradores.
+                  </p>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
+                          <th className="px-3 py-2 text-left font-medium">Fator</th>
+                          <th className="px-3 py-2 text-center font-medium">Gestores (A)</th>
+                          <th className="px-3 py-2 text-center font-medium">Colaboradores (B)</th>
+                          <th className="px-3 py-2 text-center font-medium">Divergência (A−B)</th>
+                          <th className="px-3 py-2 text-left font-medium">Leitura</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {divergence.rows.map(r => {
+                          const f = factors.find(x => x.id === r.factorId)
+                          const aligned = Math.abs(r.delta) < 5
+                          const underestimated = r.delta <= -10
+                          return (
+                            <tr key={r.factorId} className="border-b border-gray-50 hover:bg-gray-50">
+                              <td className="px-3 py-2 text-xs text-gray-700">
+                                <span className="mr-1 font-mono text-gray-400">{r.factorId}</span>
+                                {f?.name ?? ''}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                  {r.scoreA}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                                  {r.scoreB}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`text-sm font-bold tabular-nums ${
+                                  aligned ? 'text-gray-400' : r.delta < 0 ? 'text-amber-600' : 'text-blue-700'
+                                }`}>
+                                  {r.delta > 0 ? '+' : ''}{r.delta}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-xs">
+                                {aligned ? (
+                                  <span className="text-gray-400">Alinhado</span>
+                                ) : r.delta < 0 ? (
+                                  <span className={underestimated ? 'font-semibold text-amber-700' : 'text-amber-600'}>
+                                    Colaboradores percebem mais risco{underestimated ? ' — ponto de atenção' : ''}
+                                  </span>
+                                ) : (
+                                  <span className="text-blue-700">Gestão percebe mais risco</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-3 text-xs italic text-gray-400">
+                    Divergência negativa (A−B &lt; 0) indica que os colaboradores percebem mais risco do que a
+                    gestão — fatores com divergência ≤ −10 merecem atenção especial na devolutiva com os gestores.
                   </p>
                 </div>
               )}
