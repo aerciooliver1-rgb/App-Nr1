@@ -210,7 +210,30 @@ export function HistoricoClient({
     new Set(factors.map(f => f.id)),
   )
 
-  // Dados para o gráfico de barras: um ponto por fator, uma barra por ciclo
+  // Rótulo único por avaliação: o mesmo ciclo pode ter Modo A (gestores)
+  // e Modo B (colaboradores) — o rótulo diferencia por modo e, se preciso, por data
+  const cycleLabel = new Map<string, string>()
+  {
+    const perCycle = new Map<number, number>()
+    cycles.forEach(c => perCycle.set(c.cycle, (perCycle.get(c.cycle) ?? 0) + 1))
+    const used = new Set<string>()
+    for (const c of cycles) {
+      let label = (perCycle.get(c.cycle) ?? 0) > 1
+        ? `Ciclo ${c.cycle} · ${c.mode}`
+        : `Ciclo ${c.cycle}`
+      if (used.has(label)) {
+        label += ` · ${new Date(c.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+      }
+      let final = label
+      let n = 2
+      while (used.has(final)) final = `${label} (${n++})`
+      used.add(final)
+      cycleLabel.set(c.assessmentId, final)
+    }
+  }
+  const labelOf = (c: { assessmentId: string }) => cycleLabel.get(c.assessmentId) ?? ''
+
+  // Dados para o gráfico de barras: um ponto por fator, uma barra por avaliação
   const barData = factors
     .filter(f => selectedFactors.has(f.id))
     .map(f => {
@@ -220,7 +243,7 @@ export function HistoricoClient({
       }
       for (const c of cycles) {
         const score = c.scores.find(s => s.factorId === f.id)
-        entry[`Ciclo ${c.cycle}`] = score ? Math.round(score.score) : 0
+        entry[labelOf(c)] = score ? Math.round(score.score) : 0
       }
       return entry
     })
@@ -327,12 +350,12 @@ export function HistoricoClient({
               {/* Legenda de ciclos */}
               <div className="mb-3 flex flex-wrap gap-3">
                 {cycles.map((c, i) => (
-                  <div key={c.cycle} className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <div key={c.assessmentId} className="flex items-center gap-1.5 text-xs text-gray-600">
                     <span
                       className="h-3 w-3 rounded-sm"
                       style={{ backgroundColor: CYCLE_COLORS[i % CYCLE_COLORS.length] }}
                     />
-                    Ciclo {c.cycle} · {new Date(c.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                    {labelOf(c)} · {new Date(c.createdAt).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
                   </div>
                 ))}
               </div>
@@ -356,8 +379,8 @@ export function HistoricoClient({
                       <ReferenceLine y={75} stroke="#ea580c" strokeDasharray="4 2" strokeOpacity={0.5} />
                       {cycles.map((c, i) => (
                         <Bar
-                          key={c.cycle}
-                          dataKey={`Ciclo ${c.cycle}`}
+                          key={c.assessmentId}
+                          dataKey={labelOf(c)}
                           fill={CYCLE_COLORS[i % CYCLE_COLORS.length]}
                           radius={[3, 3, 0, 0]}
                           maxBarSize={24}
@@ -395,8 +418,8 @@ export function HistoricoClient({
                   <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
                     <th className="px-3 py-2 text-left font-medium">Fator</th>
                     {cycles.map(c => (
-                      <th key={c.cycle} className="px-3 py-2 text-center font-medium">
-                        C#{c.cycle}
+                      <th key={c.assessmentId} className="px-3 py-2 text-center font-medium">
+                        {labelOf(c).replace('Ciclo ', 'C#')}
                       </th>
                     ))}
                   </tr>
@@ -410,9 +433,9 @@ export function HistoricoClient({
                       </td>
                       {cycles.map(c => {
                         const score = c.scores.find(s => s.factorId === f.id)
-                        if (!score) return <td key={c.cycle} className="px-3 py-2 text-center text-xs text-gray-300">—</td>
+                        if (!score) return <td key={c.assessmentId} className="px-3 py-2 text-center text-xs text-gray-300">—</td>
                         return (
-                          <td key={c.cycle} className="px-3 py-2 text-center">
+                          <td key={c.assessmentId} className="px-3 py-2 text-center">
                             <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${LEVEL_BG[score.level]}`}>
                               {Math.round(score.score)}
                             </span>
@@ -424,7 +447,7 @@ export function HistoricoClient({
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                     <td className="px-3 py-2 text-xs text-gray-700">Score Geral</td>
                     {cycles.map(c => (
-                      <td key={c.cycle} className="px-3 py-2 text-center">
+                      <td key={c.assessmentId} className="px-3 py-2 text-center">
                         <span className="text-sm font-bold text-gray-900">{c.overallScore}</span>
                       </td>
                     ))}
