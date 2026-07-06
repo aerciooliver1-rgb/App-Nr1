@@ -57,9 +57,15 @@ async function getData(): Promise<CompanyNav[]> {
           (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
         )
         const last = assessments.at(-1) ?? null
+        // As etapas seguem a ÚLTIMA avaliação do setor — a mesma cujo status
+        // aparece no chip. Se ela ainda não foi calculada (em coleta/rascunho),
+        // todas as etapas ficam bloqueadas até o ciclo fechar.
+        const target = last
+        const isCalc = last?.status === 'calculado'
         const calculados = assessments.filter(a => a.status === 'calculado')
-        const target = calculados.at(-1) ?? null
-        const exportTarget = [...calculados].reverse().find(a => a.mode === 'B') ?? target
+        const exportTarget = isCalc
+          ? ([...calculados].reverse().find(a => a.mode === 'B') ?? target)
+          : null
         const coleta = [...assessments].reverse().find(a => a.status === 'em_coleta') ?? null
 
         type PlanRow = {
@@ -85,12 +91,12 @@ async function getData(): Promise<CompanyNav[]> {
           name: sector.name,
           lastDate: last?.created_at ? formatDate(last.created_at) : null,
           lastStatus: last?.status ?? null,
-          cycle: target?.cycle ?? last?.cycle ?? null,
+          cycle: target?.cycle ?? null,
           assessmentId: target?.id ?? null,
-          isCalc: target !== null,
+          isCalc,
           // Etapa de intervenções concluída: intervenções registradas OU plano
           // com ações reais (planos rascunho vazios auto-criados não contam)
-          hasInterventions: interventionCount > 0 || actionCount > 0,
+          hasInterventions: isCalc && (interventionCount > 0 || actionCount > 0),
           hasPlan: plan !== null,
           // planos legados usam 'em_andamento'; só 'rascunho' conta como não finalizado
           planFinal: plan !== null && plan.status !== 'rascunho',

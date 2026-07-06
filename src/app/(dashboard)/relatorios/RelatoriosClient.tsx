@@ -202,20 +202,24 @@ function SectorRow({ sector, companyId }: { sector: SectorNav; companyId: string
                       Coleta ativa →
                     </Link>
                   )}
-                  <a
-                    href={`/api/export/pptx?assessmentId=${sector.exportId}`}
-                    download
-                    className="rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                  >
-                    PPTX
-                  </a>
-                  <a
-                    href={`/api/export/pdf?assessmentId=${sector.exportId}`}
-                    download
-                    className="rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
-                  >
-                    PDF
-                  </a>
+                  {sector.exportId && (
+                    <>
+                      <a
+                        href={`/api/export/pptx?assessmentId=${sector.exportId}`}
+                        download
+                        className="rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        PPTX
+                      </a>
+                      <a
+                        href={`/api/export/pdf?assessmentId=${sector.exportId}`}
+                        download
+                        className="rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                      >
+                        PDF
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
