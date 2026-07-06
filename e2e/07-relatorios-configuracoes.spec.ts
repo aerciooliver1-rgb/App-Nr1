@@ -36,11 +36,21 @@ test.describe('Relatórios', () => {
 
   test('etapa navega para o resultado do setor', async ({ page }) => {
     await page.goto('/relatorios')
-    await page.getByText('Callcenter Rápido S/A').click()
-    await page.getByRole('button', { name: /atendimento ao cliente/i }).click()
+    await page.getByText('Hospital São Lucas S/A').click()
+    await page.getByRole('button', { name: /recepção do p\.a\./i }).click()
     await page.getByRole('link', { name: 'Resultado' }).click()
     await expect(page).toHaveURL(/resultado/)
     await expect(page.getByRole('heading', { name: /resultado do diagnóstico/i })).toBeVisible()
+  })
+
+  test('setor com coleta em andamento mostra etapas bloqueadas', async ({ page }) => {
+    await page.goto('/relatorios')
+    await page.getByText('Hospital São Lucas S/A').click()
+    await page.getByRole('button', { name: /núcleo de informática/i }).click()
+    // nenhuma etapa clicável enquanto o ciclo não é calculado
+    await expect(page.getByRole('link', { name: 'Resultado' })).toHaveCount(0)
+    await expect(page.getByText(/aguardando cálculo/i)).toBeVisible()
+    await expect(page.getByRole('link', { name: /coleta ativa/i })).toBeVisible()
   })
 })
 
