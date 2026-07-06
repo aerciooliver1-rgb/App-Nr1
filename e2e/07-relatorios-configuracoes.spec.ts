@@ -3,25 +3,44 @@ import { test, expect } from '@playwright/test'
 test.use({ storageState: '.playwright/auth.json' })
 
 test.describe('Relatórios', () => {
-  test('dashboard de relatórios carrega com gráfico', async ({ page }) => {
+  test('lista as empresas cadastradas', async ({ page }) => {
     await page.goto('/relatorios')
     await expect(page.getByRole('heading', { name: /relatórios/i })).toBeVisible()
-    // Recharts renderiza SVG
-    await expect(page.locator('svg').first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('HealthTech Soluções')).toBeVisible()
+    await expect(page.getByText('Varejo Express Ltda')).toBeVisible()
+    await expect(page.getByText('Hospital São Lucas S/A')).toBeVisible()
+    await expect(page.getByText('Callcenter Rápido S/A')).toBeVisible()
   })
 
-  test('tabela de relatórios exibe as 4 empresas', async ({ page }) => {
+  test('expandir empresa mostra últimas avaliações global e por setor', async ({ page }) => {
     await page.goto('/relatorios')
-    await expect(page.locator('table').getByText('HealthTech Soluções').first()).toBeVisible()
-    await expect(page.locator('table').getByText('Varejo Express Ltda').first()).toBeVisible()
-    await expect(page.locator('table').getByText('Hospital São Lucas S/A').first()).toBeVisible()
-    await expect(page.locator('table').getByText('Callcenter Rápido S/A').first()).toBeVisible()
+    await page.getByText('Hospital São Lucas S/A').click()
+    await expect(page.getByText(/última avaliação global/i)).toBeVisible()
+    await expect(page.getByText(/últimas avaliações por setor/i)).toBeVisible()
+    await expect(page.getByText('UTI e Pronto-Socorro')).toBeVisible()
+    await expect(page.getByRole('link', { name: /relatório consolidado/i })).toBeVisible()
   })
 
-  test('links de exportação presentes na tabela', async ({ page }) => {
+  test('expandir setor mostra etapas clicáveis e exportações', async ({ page }) => {
     await page.goto('/relatorios')
+    await page.getByText('Hospital São Lucas S/A').click()
+    await page.getByRole('button', { name: /uti e pronto-socorro/i }).click()
+    await expect(page.getByText(/navegar para/i)).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Resultado' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Intervenções' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Plano de Ação' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Acompanhamento' })).toBeVisible()
     await expect(page.getByRole('link', { name: /pptx/i }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /pdf/i }).first()).toBeVisible()
+  })
+
+  test('etapa navega para o resultado do setor', async ({ page }) => {
+    await page.goto('/relatorios')
+    await page.getByText('Callcenter Rápido S/A').click()
+    await page.getByRole('button', { name: /atendimento ao cliente/i }).click()
+    await page.getByRole('link', { name: 'Resultado' }).click()
+    await expect(page).toHaveURL(/resultado/)
+    await expect(page.getByRole('heading', { name: /resultado do diagnóstico/i })).toBeVisible()
   })
 })
 

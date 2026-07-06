@@ -1,159 +1,115 @@
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/Header'
+import { formatDate } from '@/lib/utils'
 import { RelatoriosClient } from './RelatoriosClient'
-import type { RiskLevel } from '@/types/database'
-import { countManagers, respondentsFromAnswerCount } from '@/lib/calculations/risk'
-import { combineModes } from '@/lib/calculations/combine'
-import type { ModeAssessment } from '@/lib/calculations/combine'
 
-const RISK_ORDER: Record<RiskLevel, number> = { critico: 4, alto: 3, moderado: 2, baixo: 1 }
-
-export interface AssessmentRow {
+export interface SectorNav {
   id: string
-  mode: string
-  cycle: number
-  createdAt: string
-  status: string
-  companyId: string
-  companyName: string
-  sectorId: string
-  sectorName: string
-  overallScore: number
-  worstLevel: RiskLevel
-  criticalCount: number
-  highCount: number
-  respostasLabel: string
+  name: string
+  lastDate: string | null
+  lastStatus: string | null
+  cycle: number | null
+  /** Última avaliação calculada — alvo das etapas de navegação */
+  assessmentId: string | null
+  isCalc: boolean
+  hasPlan: boolean
+  planFinal: boolean
+  /** Coleta Modo B em andamento, se houver */
+  coletaId: string | null
+  /** Avaliação usada nas exportações (última Modo B calculada; senão a última calculada) */
+  exportId: string | null
 }
 
-async function getData() {
+export interface CompanyNav {
+  id: string
+  name: string
+  cnpj: string | null
+  sectorCount: number
+  lastGlobalDate: string | null
+  sectors: SectorNav[]
+}
+
+async function getData(): Promise<CompanyNav[]> {
   const supabase = await createClient()
 
-  const { data: assessments } = await supabase
-    .from('assessments')
-    .select('id, mode, cycle, created_at, status, sectors(id, name, employee_count, manager_name, company_id, companies(id, name))')
-    .eq('status', 'calculado')
-    .order('created_at', { ascending: false })
+  const { data: companies } = await supabase
+    .from('companies')
+    .select(`
+      id, name, cnpj,
+      sectors(
+        id, name, created_at,
+        assessments(
+          id, mode, status, cycle, created_at,
+          action_plans(id, status)
+        )
+      )
+    `)
+    .order('name')
 
-  if (!assessments || assessments.length === 0) {
-    return { rows: [], stats: { companies: 0, sectors: 0, assessments: 0, criticalRisks: 0 } }
-  }
+  return (companies ?? []).map(company => {
+    const sectors: SectorNav[] = [...company.sectors]
+      .sort((a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime())
+      .map(sector => {
+        const assessments = [...sector.assessments].sort(
+          (a, b) => new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime(),
+        )
+        const last = assessments.at(-1) ?? null
+        const calculados = assessments.filter(a => a.status === 'calculado')
+        const target = calculados.at(-1) ?? null
+        const exportTarget = [...calculados].reverse().find(a => a.mode === 'B') ?? target
+        const coleta = [...assessments].reverse().find(a => a.status === 'em_coleta') ?? null
 
-  // Enriquecer cada avaliação com scores e contagem de respostas
-  const enriched = await Promise.all(
-    assessments.map(async a => {
-      const sector = a.sectors as { id: string; name: string; employee_count: number | null; manager_name: string | null; company_id: string; companies: { id: string; name: string } | null } | null
-      const [{ data: scores }, { count: answerCount }] = await Promise.all([
-        supabase
-          .from('risk_scores')
-          .select('factor_id, score, level')
-          .eq('assessment_id', a.id),
-        supabase
-          .from('assessment_answers')
-          .select('id', { count: 'exact', head: true })
-          .eq('assessment_id', a.id),
-      ])
-      return { ...a, sector, scores: scores ?? [], answerCount: answerCount ?? 0 }
-    }),
-  )
+        const plan = (() => {
+          const ap = target?.action_plans
+          if (!ap) return null
+          if (Array.isArray(ap)) return (ap as { id: string; status: string }[])[0] ?? null
+          return ap as { id: string; status: string }
+        })()
 
-  // Uma linha por setor/ciclo: resultado COMBINADO de Modo A + Modo B
-  const groups = new Map<string, typeof enriched>()
-  for (const a of enriched) {
-    const key = `${a.sector?.id}#${a.cycle}`
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(a)
-  }
+        return {
+          id: sector.id,
+          name: sector.name,
+          lastDate: last?.created_at ? formatDate(last.created_at) : null,
+          lastStatus: last?.status ?? null,
+          cycle: target?.cycle ?? last?.cycle ?? null,
+          assessmentId: target?.id ?? null,
+          isCalc: target !== null,
+          hasPlan: plan !== null,
+          planFinal: plan?.status === 'finalizado',
+          coletaId: coleta?.id ?? null,
+          exportId: exportTarget?.id ?? null,
+        }
+      })
 
-  const rows: AssessmentRow[] = [...groups.values()].map(group => {
-    const combined = combineModes(
-      group.map(g => ({ id: g.id, mode: g.mode, created_at: g.created_at, risk_scores: g.scores })) as ModeAssessment[],
-    )!
-    const first = group[0]
-    const sector = first.sector
-
-    const partes: string[] = []
-    for (const g of group) {
-      const responded = respondentsFromAnswerCount(g.answerCount)
-      if (g.mode === 'A') {
-        partes.push(`${responded}/${countManagers(sector?.manager_name)} gest.`)
-      } else {
-        partes.push(`${responded}/${sector?.employee_count ?? 0} colab.`)
-      }
-    }
-
-    const latestDate = group.map(g => g.created_at ?? '').sort().at(-1) ?? ''
+    const lastGlobal = company.sectors
+      .flatMap(s => s.assessments.map(a => a.created_at))
+      .filter(Boolean)
+      .sort()
+      .at(-1)
 
     return {
-      id: combined.exportAssessmentId ?? first.id,
-      mode: combined.modes.join(' + '),
-      cycle: first.cycle,
-      createdAt: latestDate,
-      status: first.status,
-      companyId: sector?.company_id ?? '',
-      companyName: sector?.companies?.name ?? 'Empresa',
-      sectorId: sector?.id ?? '',
-      sectorName: sector?.name ?? 'Setor',
-      overallScore: combined.overallScore,
-      worstLevel: [...combined.factorScores].sort(
-        (x, y) => (RISK_ORDER[y.level] ?? 0) - (RISK_ORDER[x.level] ?? 0),
-      )[0]?.level ?? 'baixo',
-      criticalCount: combined.factorScores.filter(s => s.level === 'critico').length,
-      highCount: combined.factorScores.filter(s => s.level === 'alto').length,
-      respostasLabel: partes.join(' · '),
+      id: company.id,
+      name: company.name,
+      cnpj: company.cnpj,
+      sectorCount: company.sectors.length,
+      lastGlobalDate: lastGlobal ? formatDate(lastGlobal) : null,
+      sectors,
     }
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
-  const uniqueCompanies = new Set(rows.map(r => r.companyId)).size
-  const uniqueSectors = new Set(rows.map(r => r.sectorId)).size
-  const totalCritical = rows.reduce((sum, r) => sum + r.criticalCount, 0)
-
-  return {
-    rows,
-    stats: {
-      companies: uniqueCompanies,
-      sectors: uniqueSectors,
-      assessments: rows.length,
-      criticalRisks: totalCritical,
-    },
-  }
+  })
 }
 
 export default async function RelatoriosPage() {
-  const { rows, stats } = await getData()
+  const companies = await getData()
 
   return (
     <>
       <Header title="Relatórios" />
       <div className="p-6">
-        <div className="mx-auto max-w-7xl space-y-6">
-          {/* Cards de métricas */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: 'Empresas avaliadas',    value: stats.companies,    stripe: 'border-t-blue-500',    num: 'text-blue-700' },
-              { label: 'Setores avaliados',      value: stats.sectors,      stripe: 'border-t-purple-500',  num: 'text-purple-700' },
-              { label: 'Avaliações concluídas',  value: stats.assessments,  stripe: 'border-t-emerald-500', num: 'text-emerald-700' },
-              { label: 'Fatores críticos',       value: stats.criticalRisks, stripe: 'border-t-red-500',    num: 'text-red-700' },
-            ].map(s => (
-              <div key={s.label} className={`rounded-xl border border-gray-200 border-t-4 bg-white p-5 shadow-sm ${s.stripe}`}>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
-                <p className={`mt-2 text-4xl font-bold tabular-nums ${s.num}`}>{s.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {rows.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 py-20 text-center">
-              <p className="text-sm text-gray-400">Nenhuma avaliação concluída ainda.</p>
-              <a
-                href="/empresas"
-                className="mt-4 inline-block rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                Iniciar avaliação
-              </a>
-            </div>
-          ) : (
-            <RelatoriosClient rows={rows} />
-          )}
+        <div className="mx-auto max-w-4xl">
+          <p className="mb-5 text-sm text-gray-400">
+            Selecione uma empresa para ver as últimas avaliações e navegar pelas etapas do diagnóstico.
+          </p>
+          <RelatoriosClient companies={companies} />
         </div>
       </div>
     </>
