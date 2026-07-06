@@ -236,23 +236,23 @@ function SectorRow({ sector, companyId }: { sector: SectorNav; companyId: string
                 <StepButton
                   icon={<IconPlano />}
                   label="Plano de Ação"
-                  active={sector.hasPlan}
+                  active={sector.hasInterventions}
                   href={`${base}/plano`}
-                  sublabel={sector.hasPlan ? undefined : 'Requer intervenções'}
+                  sublabel={sector.hasInterventions ? undefined : 'Requer intervenções definidas'}
                 />
                 <StepButton
                   icon={<IconApresentacao />}
                   label="Apresentação"
-                  active={sector.planFinal}
+                  active={sector.hasInterventions && sector.planFinal}
                   href={`${base}/apresentacao`}
-                  sublabel={sector.planFinal ? undefined : 'Requer plano finalizado'}
+                  sublabel={sector.hasInterventions && sector.planFinal ? undefined : 'Requer plano finalizado'}
                 />
                 <StepButton
                   icon={<IconAcompanhamento />}
                   label="Acompanhamento"
-                  active={sector.hasPlan}
+                  active={sector.hasInterventions && sector.planFinal && sector.hasApproval}
                   href={`${base}/acompanhamento`}
-                  sublabel={sector.hasPlan ? undefined : 'Requer plano de ação'}
+                  sublabel={sector.hasInterventions && sector.planFinal && sector.hasApproval ? undefined : 'Requer apresentação concluída'}
                 />
               </div>
             </>

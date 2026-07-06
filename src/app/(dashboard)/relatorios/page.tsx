@@ -12,8 +12,10 @@ export interface SectorNav {
   /** Última avaliação calculada — alvo das etapas de navegação */
   assessmentId: string | null
   isCalc: boolean
+  hasInterventions: boolean
   hasPlan: boolean
   planFinal: boolean
+  hasApproval: boolean
   /** Coleta Modo B em andamento, se houver */
   coletaId: string | null
   /** Avaliação usada nas exportações (última Modo B calculada; senão a última calculada) */
@@ -40,7 +42,8 @@ async function getData(): Promise<CompanyNav[]> {
         id, name, created_at,
         assessments(
           id, mode, status, cycle, created_at,
-          action_plans(id, status)
+          interventions(count),
+          action_plans(id, status, approvals(count), actions(count))
         )
       )
     `)
@@ -59,12 +62,23 @@ async function getData(): Promise<CompanyNav[]> {
         const exportTarget = [...calculados].reverse().find(a => a.mode === 'B') ?? target
         const coleta = [...assessments].reverse().find(a => a.status === 'em_coleta') ?? null
 
+        type PlanRow = {
+          id: string
+          status: string
+          approvals: { count: number }[] | null
+          actions: { count: number }[] | null
+        }
         const plan = (() => {
-          const ap = target?.action_plans
+          const ap = target?.action_plans as unknown as PlanRow | PlanRow[] | null
           if (!ap) return null
-          if (Array.isArray(ap)) return (ap as { id: string; status: string }[])[0] ?? null
-          return ap as { id: string; status: string }
+          if (Array.isArray(ap)) return ap[0] ?? null
+          return ap
         })()
+
+        const interventionCount =
+          (target?.interventions as unknown as { count: number }[] | null)?.[0]?.count ?? 0
+        const approvalCount = plan?.approvals?.[0]?.count ?? 0
+        const actionCount = plan?.actions?.[0]?.count ?? 0
 
         return {
           id: sector.id,
@@ -74,8 +88,13 @@ async function getData(): Promise<CompanyNav[]> {
           cycle: target?.cycle ?? last?.cycle ?? null,
           assessmentId: target?.id ?? null,
           isCalc: target !== null,
+          // Etapa de intervenções concluída: intervenções registradas OU plano
+          // com ações reais (planos rascunho vazios auto-criados não contam)
+          hasInterventions: interventionCount > 0 || actionCount > 0,
           hasPlan: plan !== null,
-          planFinal: plan?.status === 'finalizado',
+          // planos legados usam 'em_andamento'; só 'rascunho' conta como não finalizado
+          planFinal: plan !== null && plan.status !== 'rascunho',
+          hasApproval: approvalCount > 0,
           coletaId: coleta?.id ?? null,
           exportId: exportTarget?.id ?? null,
         }
