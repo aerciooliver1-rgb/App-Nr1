@@ -542,6 +542,13 @@ export type Database = {
       programs: {
         Row: {
           code: string | null
+          indicators: string | null
+          materials: string | null
+          methodology: string | null
+          objectives: string | null
+          partner_profile: string | null
+          reference_norms: string | null
+          structure: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -562,6 +569,13 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           code?: string | null
+          indicators?: string | null
+          materials?: string | null
+          methodology?: string | null
+          objectives?: string | null
+          partner_profile?: string | null
+          reference_norms?: string | null
+          structure?: string | null
           factor_ids?: string | null
           level?: string | null
           modality?: string | null
@@ -579,6 +593,13 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           code?: string | null
+          indicators?: string | null
+          materials?: string | null
+          methodology?: string | null
+          objectives?: string | null
+          partner_profile?: string | null
+          reference_norms?: string | null
+          structure?: string | null
           factor_ids?: string | null
           level?: string | null
           modality?: string | null
