@@ -310,12 +310,22 @@ function CompanyCard({ company }: { company: CompanyNav }) {
                 {company.lastGlobalDate ?? '—'}
               </p>
             </div>
-            <Link
-              href={`/relatorios/empresa/${company.id}`}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
-            >
-              Relatório Consolidado →
-            </Link>
+            {company.hasCurrentResults ? (
+              <Link
+                href={`/relatorios/empresa/${company.id}`}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+              >
+                Relatório Consolidado →
+              </Link>
+            ) : (
+              <span
+                title="Disponível quando houver avaliação calculada"
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-xs font-medium text-gray-400"
+              >
+                <IconLock />
+                Relatório Consolidado — aguardando cálculo
+              </span>
+            )}
           </div>
 
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">

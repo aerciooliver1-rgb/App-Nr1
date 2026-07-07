@@ -52,6 +52,13 @@ test.describe('Relatórios', () => {
     await expect(page.getByText(/aguardando cálculo/i)).toBeVisible()
     await expect(page.getByRole('link', { name: /coleta ativa/i })).toBeVisible()
   })
+
+  test('empresa só com coleta em andamento não oferece relatório consolidado', async ({ page }) => {
+    await page.goto('/relatorios')
+    await page.getByText('Callcenter Rápido S/A').click()
+    await expect(page.getByRole('link', { name: /relatório consolidado/i })).toHaveCount(0)
+    await expect(page.getByText(/aguardando cálculo/i).first()).toBeVisible()
+  })
 })
 
 test.describe('Configurações', () => {

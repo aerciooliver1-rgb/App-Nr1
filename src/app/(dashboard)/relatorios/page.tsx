@@ -28,6 +28,8 @@ export interface CompanyNav {
   cnpj: string | null
   sectorCount: number
   lastGlobalDate: string | null
+  /** Ao menos um setor com a última avaliação calculada — habilita o consolidado */
+  hasCurrentResults: boolean
   sectors: SectorNav[]
 }
 
@@ -118,6 +120,7 @@ async function getData(): Promise<CompanyNav[]> {
       cnpj: company.cnpj,
       sectorCount: company.sectors.length,
       lastGlobalDate: lastGlobal ? formatDate(lastGlobal) : null,
+      hasCurrentResults: sectors.some(s => s.isCalc),
       sectors,
     }
   })
