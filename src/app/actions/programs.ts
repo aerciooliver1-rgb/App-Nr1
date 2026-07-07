@@ -12,7 +12,18 @@ export interface ProgramRow {
   description: string | null
   type: 'padrao' | 'personalizado'
   created_at: string | null
+  code: string | null
+  level: string | null
+  factor_ids: string | null
+  workload: string | null
+  start_deadline: string | null
+  target_audience: string | null
+  modality: string | null
+  sessions: string | null
 }
+
+const PROGRAM_FIELDS =
+  'id, name, description, type, created_at, code, level, factor_ids, workload, start_deadline, target_audience, modality, sessions'
 
 // ─── Listar programas padrão ──────────────────────────────────────────────────
 
@@ -20,36 +31,76 @@ export async function listPadraoPrograms(): Promise<ProgramRow[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('programs')
-    .select('id, name, description, type, created_at')
+    .select(PROGRAM_FIELDS)
     .eq('type', 'padrao')
-    .order('name')
+    .order('code')
   return (data ?? []) as ProgramRow[]
 }
 
-// ─── Criar programa ───────────────────────────────────────────────────────────
+// ─── Validação ────────────────────────────────────────────────────────────────
 
 const programSchema = z.object({
   name: z.string().min(2, 'Informe o nome do programa'),
   description: z.string().optional(),
+  code: z.string().optional(),
+  level: z.enum(['critico', 'alto', 'moderado']).optional(),
+  workload: z.string().optional(),
+  start_deadline: z.string().optional(),
+  target_audience: z.string().optional(),
+  modality: z.string().optional(),
+  sessions: z.string().optional(),
 })
 
-export async function createProgram(prev: ProgramFormState, formData: FormData): Promise<ProgramFormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.' }
-
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return { error: 'Apenas administradores podem criar programas padrão.' }
-
+function extractFields(formData: FormData) {
   const validated = programSchema.safeParse(Object.fromEntries(formData))
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
 
-  const { name, description } = validated.data
+  // Fatores NR-1: checkboxes múltiplos (F01–F13) ou prevenção geral
+  const factors = formData.getAll('factors').map(String).filter(Boolean)
+  const factor_ids = factors.includes('todos')
+    ? 'Todos (prevenção)'
+    : factors.length > 0
+      ? factors.sort().join(' · ')
+      : null
+
+  const d = validated.data
+  return {
+    fields: {
+      name: d.name,
+      description: d.description || null,
+      code: d.code || null,
+      level: d.level ?? null,
+      factor_ids,
+      workload: d.workload || null,
+      start_deadline: d.start_deadline || null,
+      target_audience: d.target_audience || null,
+      modality: d.modality || null,
+      sessions: d.sessions || null,
+    },
+  }
+}
+
+async function requireAdmin() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { supabase, error: 'Não autorizado.' }
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') return { supabase, error: 'Apenas administradores podem gerenciar programas padrão.' }
+  return { supabase, user }
+}
+
+// ─── Criar programa ───────────────────────────────────────────────────────────
+
+export async function createProgram(prev: ProgramFormState, formData: FormData): Promise<ProgramFormState> {
+  const { supabase, user, error: authError } = await requireAdmin()
+  if (authError || !user) return { error: authError }
+
+  const parsed = extractFields(formData)
+  if ('errors' in parsed) return { errors: parsed.errors }
 
   const { error } = await supabase.from('programs').insert({
-    name,
-    description: description || null,
+    ...parsed.fields,
     type: 'padrao',
     created_by: user.id,
   })
@@ -67,22 +118,15 @@ export async function updateProgram(
   prev: ProgramFormState,
   formData: FormData,
 ): Promise<ProgramFormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.' }
+  const { supabase, error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
 
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return { error: 'Apenas administradores podem editar programas padrão.' }
-
-  const validated = programSchema.safeParse(Object.fromEntries(formData))
-  if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
-
-  const { name, description } = validated.data
+  const parsed = extractFields(formData)
+  if ('errors' in parsed) return { errors: parsed.errors }
 
   const { error } = await supabase
     .from('programs')
-    .update({ name, description: description || null, updated_at: new Date().toISOString() })
+    .update({ ...parsed.fields, updated_at: new Date().toISOString() })
     .eq('id', programId)
     .eq('type', 'padrao')
 
@@ -95,13 +139,8 @@ export async function updateProgram(
 // ─── Excluir programa ─────────────────────────────────────────────────────────
 
 export async function deleteProgram(programId: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.' }
-
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return { error: 'Apenas administradores podem excluir programas padrão.' }
+  const { supabase, error: authError } = await requireAdmin()
+  if (authError) return { error: authError }
 
   const { error } = await supabase
     .from('programs')

@@ -541,18 +541,34 @@ export type Database = {
       }
       programs: {
         Row: {
+          code: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
+          factor_ids: string | null
           id: string
+          level: string | null
+          modality: string | null
           name: string
+          sessions: string | null
+          start_deadline: string | null
+          target_audience: string | null
           type: Database["public"]["Enums"]["program_type"]
           updated_at: string | null
+          workload: string | null
         }
         Insert: {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          code?: string | null
+          factor_ids?: string | null
+          level?: string | null
+          modality?: string | null
+          sessions?: string | null
+          start_deadline?: string | null
+          target_audience?: string | null
+          workload?: string | null
           id?: string
           name: string
           type?: Database["public"]["Enums"]["program_type"]
@@ -562,6 +578,14 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          code?: string | null
+          factor_ids?: string | null
+          level?: string | null
+          modality?: string | null
+          sessions?: string | null
+          start_deadline?: string | null
+          target_audience?: string | null
+          workload?: string | null
           id?: string
           name?: string
           type?: Database["public"]["Enums"]["program_type"]

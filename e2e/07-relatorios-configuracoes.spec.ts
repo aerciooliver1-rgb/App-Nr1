@@ -86,7 +86,10 @@ test.describe('Catálogo de Programas', () => {
   test('catálogo exibe programas padrão do seed', async ({ page }) => {
     await page.goto('/catalogo')
     await expect(page.getByRole('heading', { name: /catálogo de programas/i })).toBeVisible()
-    await expect(page.getByText(/Escuta Ativa|Liderança|Estresse/i).first()).toBeVisible()
+    await expect(page.getByText(/Assédio|Burnout|Liderança/i).first()).toBeVisible()
+    // agrupamento por nível de risco e ficha técnica dos programas
+    await expect(page.getByText(/crítico — início em até 30 dias/i)).toBeVisible()
+    await expect(page.getByText(/carga horária/i).first()).toBeVisible()
   })
 
   test('botão Novo Programa visível', async ({ page }) => {
