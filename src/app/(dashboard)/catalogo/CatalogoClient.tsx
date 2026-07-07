@@ -44,7 +44,7 @@ const LEVEL_CONFIG: Record<string, {
   },
 }
 
-const LEVEL_ORDER = ['critico', 'alto', 'moderado', 'outros']
+const LEVEL_ORDER = ['moderado', 'alto', 'critico', 'outros']
 
 function SaveButton({ label = 'Salvar' }: { label?: string }) {
   const { pending } = useFormStatus()
