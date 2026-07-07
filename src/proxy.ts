@@ -10,6 +10,8 @@ const PUBLIC_ROUTES = [
 const PUBLIC_PREFIXES = [
   '/avaliacao/',
   '/aprovacao/',
+  // Webhooks de serviços externos autenticam por token próprio (ex.: hottok da Hotmart)
+  '/api/webhooks/',
 ]
 
 export async function proxy(request: NextRequest) {

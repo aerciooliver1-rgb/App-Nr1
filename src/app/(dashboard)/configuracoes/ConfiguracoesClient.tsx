@@ -412,6 +412,12 @@ const PLAN_CONFIG: Record<string, {
   anual:     { label: 'Anual',     color: 'border-t-emerald-500', chip: 'bg-emerald-100 text-emerald-700' },
 }
 
+const HOTMART_CHECKOUT: Record<string, string | undefined> = {
+  mensal: process.env.NEXT_PUBLIC_HOTMART_CHECKOUT_MENSAL,
+  semestral: process.env.NEXT_PUBLIC_HOTMART_CHECKOUT_SEMESTRAL,
+  anual: process.env.NEXT_PUBLIC_HOTMART_CHECKOUT_ANUAL,
+}
+
 const PLANS = [
   {
     id: 'mensal',
@@ -592,6 +598,19 @@ function PlanoTab({
                 <div className="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-center text-xs font-semibold text-gray-400">
                   Plano atual
                 </div>
+              ) : HOTMART_CHECKOUT[plan.id] ? (
+                <a
+                  href={HOTMART_CHECKOUT[plan.id]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`mt-4 block rounded-lg px-3 py-2 text-center text-xs font-semibold transition-colors ${
+                    plan.highlight
+                      ? 'bg-violet-600 text-white hover:bg-violet-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  Assinar agora →
+                </a>
               ) : (
                 <a
                   href={`mailto:aerciooliver1@gmail.com?subject=Upgrade%20para%20plano%20${plan.name}&body=Olá,%20gostaria%20de%20fazer%20upgrade%20para%20o%20plano%20${plan.name}.`}
@@ -608,7 +627,7 @@ function PlanoTab({
           ))}
         </div>
         <p className="mt-3 text-center text-[11px] text-gray-400">
-          Planos sem fidelidade. Pagamento por transferência bancária ou PIX.
+          Planos sem fidelidade. Pagamento seguro via Hotmart (cartão, PIX ou boleto) — ativação automática após a confirmação. Compre com o mesmo e-mail usado no login.
           Excedente de R$ 2,00 por avaliação acima do plano, faturado no fechamento do mês.
           Capacidade máxima: 6.000 avaliações/mês. Entre em contato para contratar ou tirar dúvidas.
         </p>
