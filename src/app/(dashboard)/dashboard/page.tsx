@@ -4,6 +4,7 @@ import { RiskBadge } from '@/components/features/RiskBadge'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
+import { PLAN_RESPONSE_LIMITS } from '@/lib/billing'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -72,7 +73,6 @@ async function getDashboardData() {
 
   const now = new Date()
   const in24h = new Date(now.getTime() + 86_400_000)
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
   const [
     companiesRes,
@@ -85,8 +85,7 @@ async function getDashboardData() {
     recentRes,
     riskScoresRes,
     subscriptionRes,
-    assessmentsThisMonthRes,
-    companiesWithCalculadoRes,
+    responsesThisMonthRes,
   ] = await Promise.all([
     supabase.from('companies').select('id', { count: 'exact', head: true }),
     supabase.from('actions').select('id', { count: 'exact', head: true })
@@ -135,17 +134,10 @@ async function getDashboardData() {
       ? supabase.from('subscriptions').select('*').eq('user_id', user.id).maybeSingle()
       : Promise.resolve({ data: null }),
 
-    // Assessments created this month
-    supabase
-      .from('assessments')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', monthStart),
-
-    // Companies with at least one calculado assessment
-    supabase
-      .from('assessments')
-      .select('sectors(company_id)', { count: 'exact' })
-      .eq('status', 'calculado'),
+    // Avaliações respondidas no mês (unidade de cobrança do plano)
+    user
+      ? supabase.rpc('count_monthly_responses', { p_user_id: user.id })
+      : Promise.resolve({ data: 0 }),
   ])
 
   const pipeline = { rascunho: 0, em_coleta: 0, concluido: 0, calculado: 0 }
@@ -175,20 +167,13 @@ async function getDashboardData() {
     .slice(0, 5)
 
   const totalCompanies = companiesRes.count ?? 0
-  const assessmentsThisMonth = assessmentsThisMonthRes.count ?? 0
-
-  // Conformidade NR-1: % de empresas com pelo menos 1 avaliação calculada
-  const companyIds = new Set(
-    (companiesWithCalculadoRes.data ?? []).map((row: { sectors: { company_id: string } | null }) => row.sectors?.company_id).filter(Boolean)
-  )
-  const companiesWithCalculado = companyIds.size
-  const conformidade = totalCompanies > 0 ? Math.round((companiesWithCalculado / totalCompanies) * 100) : 0
+  const responsesThisMonth = (responsesThisMonthRes.data as number | null) ?? 0
 
   return {
     kpis: {
       companies: totalCompanies,
-      assessmentsThisMonth,
-      conformidade,
+      responsesThisMonth,
+      activeCollections: pipeline.em_coleta,
       overdue: overdueCountRes.count ?? 0,
     },
     subscription: subscriptionRes.data ?? null,
@@ -216,11 +201,9 @@ function KpiCard({
   valueColor: string
   alert?: boolean
 }) {
-  return (
-    <Link
-      href={href}
-      className={`group relative block rounded-xl border border-gray-200 border-t-4 bg-white px-6 py-5 shadow-sm transition-shadow hover:shadow-md ${topColor}`}
-    >
+  const className = `group relative block rounded-xl border border-gray-200 border-t-4 bg-white px-6 py-5 shadow-sm transition-shadow hover:shadow-md ${topColor}`
+  const inner = (
+    <>
       {alert && (
         <span className="absolute right-3 top-3 flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -232,8 +215,13 @@ function KpiCard({
       <p className={`mt-3 text-4xl font-bold tabular-nums ${valueColor}`}>
         {display ?? value}
       </p>
-    </Link>
+    </>
   )
+  // Âncora na própria página (ex.: #atencao-necessaria) usa <a> simples
+  if (href.startsWith('#')) {
+    return <a href={href} className={className}>{inner}</a>
+  }
+  return <Link href={href} className={className}>{inner}</Link>
 }
 
 function AlertIcon({ type, className }: { type: 'overdue' | 'token' | 'approval'; className?: string }) {
@@ -317,19 +305,19 @@ function AlertRow({
 
 function PlanBanner({
   subscription,
-  assessmentsThisMonth,
+  responsesThisMonth,
 }: {
   subscription: {
     plan_type: string
     status: string
-    assessments_monthly_limit: number
+    responses_monthly_limit: number
     period_end: string
   } | null
-  assessmentsThisMonth: number
+  responsesThisMonth: number
 }) {
   const planType = subscription?.plan_type ?? 'trial'
-  const limit = subscription?.assessments_monthly_limit ?? 10
-  const used = assessmentsThisMonth
+  const limit = subscription?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
+  const used = responsesThisMonth
   const pct = Math.min(100, Math.round((used / limit) * 100))
   const barColor = usageBarColor(pct)
   const days = subscription ? daysRemaining(subscription.period_end) : 0
@@ -363,7 +351,7 @@ function PlanBanner({
         <div className="flex-1">
           <div className="mb-1.5 flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
-              Avaliações este mês
+              Avaliações respondidas este mês
             </p>
             <span className={`text-xs font-semibold tabular-nums ${isNearLimit ? 'text-amber-600' : 'text-gray-600'}`}>
               {used} / {limit.toLocaleString('pt-BR')}
@@ -436,7 +424,7 @@ export default async function DashboardPage() {
         {/* ── Plano & Uso ───────────────────────────────────────────────────── */}
         <PlanBanner
           subscription={subscription}
-          assessmentsThisMonth={kpis.assessmentsThisMonth}
+          responsesThisMonth={kpis.responsesThisMonth}
         />
 
         {/* ── Onboarding (sem empresas) ──────────────────────────────────────── */}
@@ -473,37 +461,36 @@ export default async function DashboardPage() {
           />
           <KpiCard
             label="Avaliações"
-            sublabel="este mês"
-            value={kpis.assessmentsThisMonth}
-            href="/empresas"
+            sublabel="respondidas este mês"
+            value={kpis.responsesThisMonth}
+            href="/configuracoes?tab=plano"
             topColor="border-t-violet-500"
             valueColor="text-violet-600"
           />
           <KpiCard
-            label="Conformidade"
-            sublabel="NR-1 (empresas)"
-            value={kpis.conformidade}
-            display={`${kpis.conformidade}%`}
-            href="/empresas"
-            topColor={kpis.conformidade >= 80 ? 'border-t-emerald-500' : kpis.conformidade >= 50 ? 'border-t-amber-400' : 'border-t-gray-200'}
-            valueColor={kpis.conformidade >= 80 ? 'text-emerald-600' : kpis.conformidade >= 50 ? 'text-amber-600' : 'text-gray-400'}
+            label="Coletas"
+            sublabel="ativas agora"
+            value={kpis.activeCollections}
+            href="/relatorios"
+            topColor={kpis.activeCollections > 0 ? 'border-t-cyan-500' : 'border-t-gray-200'}
+            valueColor={kpis.activeCollections > 0 ? 'text-cyan-600' : 'text-gray-300'}
           />
           <KpiCard
             label="Ações"
             sublabel="atrasadas"
             value={kpis.overdue}
-            href="/empresas"
+            href="#atencao-necessaria"
             topColor={kpis.overdue > 0 ? 'border-t-red-500' : 'border-t-gray-200'}
             valueColor={kpis.overdue > 0 ? 'text-red-600' : 'text-gray-300'}
             alert={kpis.overdue > 0}
           />
         </div>
 
-        {/* ── Middle Row ────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        {/* ── Coleta e pendências: Atenção Necessária × Avaliações Finalizadas ── */}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
           {/* Atenção Necessária */}
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm md:col-span-2">
+          <div id="atencao-necessaria" className="overflow-hidden scroll-mt-6 rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
                 Atenção Necessária
@@ -595,43 +582,61 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* Perfil de Risco */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              Perfil de Risco
-            </h2>
-            {totalRisk === 0 ? (
+          {/* Avaliações Finalizadas */}
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                Avaliações Finalizadas
+              </h2>
+              <Link href="/relatorios" className="text-xs font-medium text-blue-600 hover:text-blue-700">
+                Ver todas →
+              </Link>
+            </div>
+            {recentAssessments.length === 0 ? (
               <p className="py-10 text-center text-xs text-gray-400">
                 Nenhuma avaliação calculada
               </p>
             ) : (
-              <div className="space-y-4">
-                {RISK_LEVELS.map(level => {
-                  const count = riskDist[level]
-                  const pct = Math.round((count / totalRisk) * 100)
+              <div className="divide-y divide-gray-100">
+                {recentAssessments.map(a => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const sector = a.sectors as any
+                  const company = sector?.companies
+                  const risk = worstRisk(
+                    (a.risk_scores as { level: string }[]).map(r => r.level)
+                  )
+                  const href = company && sector
+                    ? `/empresas/${company.id}/setores/${sector.id}/avaliacao/${a.id}/resultado`
+                    : null
                   return (
-                    <div key={level}>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className={`text-xs font-semibold ${RISK_TEXT[level]}`}>
-                          {RISK_LABEL[level]}
-                        </span>
-                        <span className="text-xs tabular-nums text-gray-500">
-                          {count}
-                          <span className="ml-1 text-gray-300">{pct}%</span>
-                        </span>
+                    <div key={a.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-800">
+                          {company?.name ?? '—'}
+                        </p>
+                        <p className="truncate text-xs text-gray-400">
+                          {sector?.name ?? '—'} · Ciclo #{a.cycle}
+                        </p>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className={`h-2 rounded-full transition-all duration-500 ${RISK_BAR[level]}`}
-                          style={{ width: `${pct}%` }}
-                        />
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {risk && <RiskBadge level={risk} />}
+                        <span className="text-[11px] text-gray-400">{timeAgo(a.updated_at)}</span>
                       </div>
+                      {href && (
+                        <Link
+                          href={href}
+                          className="shrink-0 text-xs text-blue-500 transition-colors hover:text-blue-700"
+                          aria-label="Ver resultado"
+                        >
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
+                            strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                            <path d="M6 3l5 5-5 5" />
+                          </svg>
+                        </Link>
+                      )}
                     </div>
                   )
                 })}
-                <p className="pt-1 text-right text-[11px] text-gray-400">
-                  {totalRisk} fatores avaliados
-                </p>
               </div>
             )}
           </div>
@@ -707,61 +712,47 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          {/* Últimas Avaliações */}
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-100 px-5 py-3.5">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                Últimas Avaliações
-              </h2>
-            </div>
-            {recentAssessments.length === 0 ? (
+          {/* Perfil de Risco */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+              Perfil de Risco
+            </h2>
+            {totalRisk === 0 ? (
               <p className="py-10 text-center text-xs text-gray-400">
                 Nenhuma avaliação calculada
               </p>
             ) : (
-              <div className="divide-y divide-gray-100">
-                {recentAssessments.map(a => {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const sector = a.sectors as any
-                  const company = sector?.companies
-                  const risk = worstRisk(
-                    (a.risk_scores as { level: string }[]).map(r => r.level)
-                  )
-                  const href = company && sector
-                    ? `/empresas/${company.id}/setores/${sector.id}/avaliacao/${a.id}/resultado`
-                    : null
+              <div className="space-y-4">
+                {RISK_LEVELS.map(level => {
+                  const count = riskDist[level]
+                  const pct = Math.round((count / totalRisk) * 100)
                   return (
-                    <div key={a.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-800">
-                          {company?.name ?? '—'}
-                        </p>
-                        <p className="truncate text-xs text-gray-400">
-                          {sector?.name ?? '—'} · Ciclo #{a.cycle}
-                        </p>
+                    <div key={level}>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className={`text-xs font-semibold ${RISK_TEXT[level]}`}>
+                          {RISK_LABEL[level]}
+                        </span>
+                        <span className="text-xs tabular-nums text-gray-500">
+                          {count}
+                          <span className="ml-1 text-gray-300">{pct}%</span>
+                        </span>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        {risk && <RiskBadge level={risk} />}
-                        <span className="text-[11px] text-gray-400">{timeAgo(a.updated_at)}</span>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-500 ${RISK_BAR[level]}`}
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
-                      {href && (
-                        <Link
-                          href={href}
-                          className="shrink-0 text-xs text-blue-500 transition-colors hover:text-blue-700"
-                          aria-label="Ver resultado"
-                        >
-                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"
-                            strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                            <path d="M6 3l5 5-5 5" />
-                          </svg>
-                        </Link>
-                      )}
                     </div>
                   )
                 })}
+                <p className="pt-1 text-right text-[11px] text-gray-400">
+                  {totalRisk} fatores avaliados
+                </p>
               </div>
             )}
           </div>
+
 
         </div>
       </div>
