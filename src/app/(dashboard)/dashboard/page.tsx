@@ -10,18 +10,6 @@ import { PLAN_RESPONSE_LIMITS } from '@/lib/billing'
 
 const RISK_LEVELS: RiskLevel[] = ['critico', 'alto', 'moderado', 'baixo']
 
-const RISK_LABEL: Record<RiskLevel, string> = {
-  critico: 'Crítico', alto: 'Alto', moderado: 'Moderado', baixo: 'Baixo',
-}
-
-const RISK_BAR: Record<RiskLevel, string> = {
-  critico: 'bg-red-500', alto: 'bg-orange-400', moderado: 'bg-amber-400', baixo: 'bg-emerald-400',
-}
-
-const RISK_TEXT: Record<RiskLevel, string> = {
-  critico: 'text-red-600', alto: 'text-orange-600', moderado: 'text-amber-600', baixo: 'text-emerald-600',
-}
-
 const PLAN_LABEL: Record<string, string> = {
   trial: 'Trial',
   mensal: 'Mensal',
@@ -405,16 +393,10 @@ export default async function DashboardPage() {
     overdueActions,
     expiringTokens,
     awaitingApproval,
-    pipeline,
-    actionsByStatus,
-    riskDist,
     recentAssessments,
   } = await getDashboardData()
 
-  const totalRisk = RISK_LEVELS.reduce((s, l) => s + riskDist[l], 0)
   const totalAlerts = overdueActions.length + expiringTokens.length + awaitingApproval.length
-  const totalActions = Object.values(actionsByStatus).reduce((s, n) => s + n, 0)
-  const totalAssessments = Object.values(pipeline).reduce((s, n) => s + n, 0)
 
   return (
     <>
@@ -490,7 +472,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
 
           {/* Atenção Necessária */}
-          <div id="atencao-necessaria" className="overflow-hidden scroll-mt-6 rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div id="atencao-necessaria" className="overflow-hidden scroll-mt-6 rounded-xl border border-gray-200 border-t-4 border-t-red-500 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
                 Atenção Necessária
@@ -583,7 +565,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Avaliações Finalizadas */}
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-gray-200 border-t-4 border-t-emerald-500 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
                 Avaliações Finalizadas
@@ -643,118 +625,6 @@ export default async function DashboardPage() {
 
         </div>
 
-        {/* ── Bottom Row ────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-
-          {/* Pipeline de Avaliações */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              Pipeline de Avaliações
-            </h2>
-            <div className="space-y-3">
-              {(
-                [
-                  { key: 'rascunho',  label: 'Rascunho',  dot: 'bg-gray-300',    text: 'text-gray-500'    },
-                  { key: 'em_coleta', label: 'Em Coleta', dot: 'bg-violet-400',   text: 'text-violet-600'  },
-                  { key: 'concluido', label: 'Concluído', dot: 'bg-blue-400',     text: 'text-blue-600'    },
-                  { key: 'calculado', label: 'Calculado', dot: 'bg-emerald-500',  text: 'text-emerald-600' },
-                ] as const
-              ).map(({ key, label, dot, text }) => {
-                const count = pipeline[key]
-                const pct = totalAssessments > 0 ? Math.round((count / totalAssessments) * 100) : 0
-                return (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
-                    <span className="flex-1 text-sm text-gray-600">{label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${text}`}>{count}</span>
-                    <div className="ml-1 h-1 w-14 overflow-hidden rounded-full bg-gray-100">
-                      <div className={`h-1 rounded-full ${dot}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <p className="mt-4 text-right text-[11px] text-gray-400">
-              {totalAssessments} no total
-            </p>
-          </div>
-
-          {/* Ações por Status */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              Ações por Status
-            </h2>
-            <div className="space-y-3">
-              {(
-                [
-                  { key: 'pendente',     label: 'Pendentes',    dot: 'bg-gray-400',    text: 'text-gray-600'    },
-                  { key: 'em_andamento', label: 'Em Andamento', dot: 'bg-blue-400',    text: 'text-blue-600'    },
-                  { key: 'concluida',    label: 'Concluídas',   dot: 'bg-emerald-500', text: 'text-emerald-600' },
-                  { key: 'atrasada',     label: 'Atrasadas',    dot: 'bg-red-500',     text: 'text-red-600'     },
-                ] as const
-              ).map(({ key, label, dot, text }) => {
-                const count = actionsByStatus[key]
-                const pct = totalActions > 0 ? Math.round((count / totalActions) * 100) : 0
-                return (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
-                    <span className="flex-1 text-sm text-gray-600">{label}</span>
-                    <span className={`text-sm font-bold tabular-nums ${text}`}>{count}</span>
-                    <div className="ml-1 h-1 w-14 overflow-hidden rounded-full bg-gray-100">
-                      <div className={`h-1 rounded-full ${dot}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <p className="mt-4 text-right text-[11px] text-gray-400">
-              {totalActions} no total
-            </p>
-          </div>
-
-          {/* Perfil de Risco */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-              Perfil de Risco
-            </h2>
-            {totalRisk === 0 ? (
-              <p className="py-10 text-center text-xs text-gray-400">
-                Nenhuma avaliação calculada
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {RISK_LEVELS.map(level => {
-                  const count = riskDist[level]
-                  const pct = Math.round((count / totalRisk) * 100)
-                  return (
-                    <div key={level}>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className={`text-xs font-semibold ${RISK_TEXT[level]}`}>
-                          {RISK_LABEL[level]}
-                        </span>
-                        <span className="text-xs tabular-nums text-gray-500">
-                          {count}
-                          <span className="ml-1 text-gray-300">{pct}%</span>
-                        </span>
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className={`h-2 rounded-full transition-all duration-500 ${RISK_BAR[level]}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-                <p className="pt-1 text-right text-[11px] text-gray-400">
-                  {totalRisk} fatores avaliados
-                </p>
-              </div>
-            )}
-          </div>
-
-
-        </div>
       </div>
     </>
   )

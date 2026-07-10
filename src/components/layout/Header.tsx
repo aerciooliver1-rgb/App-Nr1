@@ -8,9 +8,12 @@ export function Header({ title }: { title?: string }) {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? null)
-    })
+    // getSession lê a sessão local (sem chamada de rede) — evita "Failed to
+    // fetch" quando a aba acorda de suspensão ou a rede oscila
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setEmail(data.session?.user.email ?? null))
+      .catch(() => {})
   }, [])
 
   return (
