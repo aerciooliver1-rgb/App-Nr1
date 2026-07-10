@@ -85,7 +85,7 @@ test.describe('Configurações', () => {
     await expect(page.getByRole('button', { name: /usuário/i })).toBeVisible()
     await page.getByRole('button', { name: /usuário/i }).click()
     await expect(page.getByText(/convidar usuário/i)).toBeVisible()
-    await expect(page.getByText(/aerciooliver1@gmail.com/i)).toBeVisible()
+    await expect(page.getByText(/aerciooliver1@gmail.com/i).first()).toBeVisible()
   })
 })
 
@@ -121,7 +121,7 @@ test.describe('Privacidade LGPD', () => {
   test('busca de colaborador filtra lista', async ({ page }) => {
     await page.goto('/privacidade')
     await page.getByPlaceholder(/nome ou e-mail/i).fill('aercio')
-    await expect(page.getByText(/aerciooliver1@gmail.com/i)).toBeVisible()
+    await expect(page.getByText(/aerciooliver1@gmail.com/i).first()).toBeVisible()
   })
 
   test('botões de exportar e excluir presentes', async ({ page }) => {
