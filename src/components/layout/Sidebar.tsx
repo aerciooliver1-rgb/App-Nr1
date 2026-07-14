@@ -89,9 +89,9 @@ export function Sidebar() {
           </svg>
         </div>
         <div className="leading-tight">
-          <p className="text-sm font-bold tracking-tight text-white">NR-1</p>
+          <p className="text-sm font-bold tracking-tight text-white">DRPS</p>
           <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
-            Psicossocial
+            Riscos Psicossociais
           </p>
         </div>
       </div>

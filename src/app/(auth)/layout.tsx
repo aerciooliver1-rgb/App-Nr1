@@ -15,9 +15,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </svg>
           </div>
           <div className="leading-tight">
-            <p className="text-sm font-bold tracking-tight text-white">NR-1</p>
+            <p className="text-sm font-bold tracking-tight text-white">DRPS</p>
             <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
-              Psicossocial
+              Riscos Psicossociais
             </p>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <path d="M7.5 10l2 2 3-3" />
             </svg>
           </div>
-          <p className="text-sm font-bold text-white">NR-1 Psicossocial</p>
+          <p className="text-sm font-bold text-white">DRPS — Diagnósticos de Riscos Psicossociais</p>
         </div>
 
         <div className="w-full max-w-sm">

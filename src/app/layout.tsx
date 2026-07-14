@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NR-1 | Diagnóstico Psicossocial",
+  title: "DRPS | Diagnósticos de Riscos Psicossociais",
   description: "Plataforma de diagnóstico de riscos psicossociais — NR-1 / Portaria MTE 1.419/2024",
 };
 
