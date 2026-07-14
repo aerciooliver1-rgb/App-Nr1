@@ -17,7 +17,7 @@ import {
 } from '@/app/actions/users'
 import type { UserFormState, ManagedUser } from '@/app/actions/users'
 import type { CompanyOption, SubscriptionData } from './page'
-import { PLAN_RESPONSE_LIMITS, summarizeUsage } from '@/lib/billing'
+import { PLAN_RESPONSE_LIMITS, summarizeUsage, currentCycle } from '@/lib/billing'
 import type { UserRole } from '@/types/database'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -519,18 +519,21 @@ function PlanoTab({
           </div>
           <p className="mt-1 text-[11px] text-gray-400">
             1 avaliação = 1 questionário completo respondido (gestor ou colaborador).
-            O contador zera no início de cada mês.
+            O contador reinicia a cada 30 dias, contados da ativação do plano
+            {subscription?.period_start && (
+              <> — próximo reinício em <strong>{currentCycle(subscription.period_start).nextReset.toLocaleDateString('pt-BR')}</strong></>
+            )}.
           </p>
 
           {usage.excess > 0 && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-xs font-semibold text-amber-800">
-                Avaliações extras: {usage.excess.toLocaleString('pt-BR')} de {usage.excessLimit.toLocaleString('pt-BR')} permitidas no mês (20% da cota)
+                Avaliações extras: {usage.excess.toLocaleString('pt-BR')} de {usage.excessLimit.toLocaleString('pt-BR')} permitidas no ciclo (20% da cota)
               </p>
               <p className="mt-0.5 text-xs text-amber-700">
                 Cobrança adicional estimada: <span className="font-bold">
                   {usage.overageBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span> (R$ 2,00 por avaliação extra, faturado no fechamento do mês)
+                </span> (R$ 2,00 por avaliação extra, faturado no fechamento do ciclo)
               </p>
             </div>
           )}
@@ -550,7 +553,7 @@ function PlanoTab({
             </div>
             {usage.blocked && (
               <p className="mt-1 text-xs text-red-600">
-                Trava atingida — novas avaliações bloqueadas até a contagem reiniciar na virada do mês.
+                Trava atingida — novas avaliações bloqueadas até o reinício do ciclo de 30 dias.
               </p>
             )}
           </div>
@@ -628,7 +631,7 @@ function PlanoTab({
         </div>
         <p className="mt-3 text-center text-[11px] text-gray-400">
           Planos sem fidelidade. Pagamento seguro via Hotmart (cartão, PIX ou boleto) — ativação automática após a confirmação. Compre com o mesmo e-mail usado no login.
-          Extras de R$ 2,00 por avaliação, limitados a 20% da cota mensal; atingida a trava, a contagem reinicia na virada do mês.
+          Extras de R$ 2,00 por avaliação, limitados a 20% da cota; a contagem reinicia a cada 30 dias, contados da ativação do plano.
         </p>
       </div>
     </div>

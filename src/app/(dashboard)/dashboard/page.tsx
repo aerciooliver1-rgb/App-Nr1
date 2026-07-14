@@ -4,7 +4,7 @@ import { RiskBadge } from '@/components/features/RiskBadge'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
-import { PLAN_RESPONSE_LIMITS, summarizeUsage } from '@/lib/billing'
+import { PLAN_RESPONSE_LIMITS, summarizeUsage, currentCycle } from '@/lib/billing'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -299,6 +299,7 @@ function PlanBanner({
     plan_type: string
     status: string
     responses_monthly_limit: number
+    period_start: string
     period_end: string
   } | null
   responsesThisMonth: number
@@ -354,14 +355,14 @@ function PlanBanner({
           </div>
           {usage.blocked ? (
             <p className="mt-1 text-[11px] font-semibold text-red-600">
-              Trava mensal atingida ({usage.monthlyCap.toLocaleString('pt-BR')}) — a contagem reinicia na virada do mês
+              Trava do ciclo atingida ({usage.monthlyCap.toLocaleString('pt-BR')}) — a contagem reinicia em {currentCycle(subscription?.period_start).nextReset.toLocaleDateString('pt-BR')}
             </p>
           ) : usage.excess > 0 ? (
             <p className="mt-1 text-[11px] text-amber-600">
               {usage.excess} extra{usage.excess !== 1 ? 's' : ''} este mês ({usage.overageBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) · até {usage.excessLimit} permitidos
             </p>
           ) : isNearLimit ? (
-            <p className="mt-1 text-[11px] text-amber-600">{100 - pct}% restante da cota mensal</p>
+            <p className="mt-1 text-[11px] text-amber-600">{100 - pct}% restante da cota do ciclo</p>
           ) : null}
         </div>
 

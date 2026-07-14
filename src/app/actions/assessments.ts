@@ -31,7 +31,7 @@ const modeASchema = z.object({
 })
 
 // Trava mensal por plano: cota + até 20% de extras (R$ 2,00 cada).
-// Atingida a trava, novas avaliações bloqueiam até a virada do mês.
+// Atingida a trava, novas avaliações bloqueiam até o reinício do ciclo de 30 dias.
 async function checkResponseCapacity(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
   const [{ data: used }, { data: sub }] = await Promise.all([
     supabase.rpc('count_monthly_responses', { p_user_id: userId }),
@@ -40,7 +40,7 @@ async function checkResponseCapacity(supabase: Awaited<ReturnType<typeof createC
   const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
   const cap = monthlyCapFor(quota)
   if ((used ?? 0) >= cap) {
-    return `Limite mensal do plano atingido (${cap.toLocaleString('pt-BR')} avaliações, já incluindo os extras). A contagem reinicia no próximo mês.`
+    return `Limite mensal do plano atingido (${cap.toLocaleString('pt-BR')} avaliações, já incluindo os extras). A contagem reinicia a cada 30 dias, contados da ativação do plano.`
   }
   return null
 }
@@ -275,7 +275,7 @@ export async function submitAnonymousAnswers(
     ])
     const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
     if ((used ?? 0) >= monthlyCapFor(quota)) {
-      return { error: 'A coleta deste mês atingiu o limite do plano. Novas respostas serão aceitas na virada do mês.' }
+      return { error: 'A coleta deste mês atingiu o limite do plano. Novas respostas serão aceitas no reinício do ciclo de 30 dias.' }
     }
   }
 

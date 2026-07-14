@@ -2,7 +2,9 @@
 //
 // Cada plano tem uma COTA MENSAL. Ultrapassando a cota, cada avaliação extra
 // custa R$ 2,00 — até o limite de 20% da cota. Atingida a trava (cota + extras),
-// novas avaliações são bloqueadas até a virada do mês, quando a contagem zera.
+// novas avaliações bloqueiam até o reinício do ciclo: a contagem renova a cada
+// 30 DIAS, contados da data de ativação do plano (period_start) — não por
+// mês-calendário. Espelha a função SQL count_monthly_responses.
 //
 //   Plano      | Total contratado      | Cota/mês | Extras máx./mês | Trava
 //   Mensal     | 300/mês               | 300      | 60              | 360
@@ -55,6 +57,18 @@ export interface UsageSummary {
   monthlyCap: number
   /** true quando a trava foi atingida — novas avaliações bloqueadas até a virada do mês */
   blocked: boolean
+}
+
+const CYCLE_MS = 30 * 86_400_000
+
+/** Ciclo de 30 dias corrente, ancorado na ativação do plano. */
+export function currentCycle(periodStart: string | null | undefined): { start: Date; nextReset: Date } {
+  const anchor = periodStart
+    ? new Date(periodStart.length <= 10 ? `${periodStart}T00:00:00` : periodStart)
+    : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const cycles = Math.max(0, Math.floor((Date.now() - anchor.getTime()) / CYCLE_MS))
+  const start = new Date(anchor.getTime() + cycles * CYCLE_MS)
+  return { start, nextReset: new Date(start.getTime() + CYCLE_MS) }
 }
 
 export function summarizeUsage(used: number, limit: number): UsageSummary {
