@@ -17,7 +17,7 @@ import {
 } from '@/app/actions/users'
 import type { UserFormState, ManagedUser } from '@/app/actions/users'
 import type { CompanyOption, SubscriptionData } from './page'
-import { PLAN_RESPONSE_LIMITS, RESPONSES_HARD_CAP, summarizeUsage } from '@/lib/billing'
+import { PLAN_RESPONSE_LIMITS, summarizeUsage } from '@/lib/billing'
 import type { UserRole } from '@/types/database'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -424,8 +424,8 @@ const PLANS = [
     name: 'Mensal',
     price: 'R$600',
     period: '/mês',
-    limit: '300',
-    perUnit: 'R$2,00 por avaliação excedente',
+    limit: '300 avaliações/mês',
+    perUnit: 'R$ 2,00 por avaliação · extras até 60/mês',
     highlight: false,
     description: 'Ideal para profissionais em início de carteira de clientes.',
   },
@@ -435,8 +435,8 @@ const PLANS = [
     price: 'R$500',
     period: '/mês',
     total: 'R$3.000 cobrado a cada 6 meses',
-    limit: '1.200',
-    perUnit: 'R$2,00 por avaliação excedente',
+    limit: '3.000 no semestre',
+    perUnit: 'Cota de 500/mês · R$ 1,00 por avaliação · extras até 100/mês',
     highlight: true,
     description: 'Melhor custo-benefício para consultores ativos.',
   },
@@ -446,8 +446,8 @@ const PLANS = [
     price: 'R$450',
     period: '/mês',
     total: 'R$5.400 cobrado anualmente',
-    limit: '3.000',
-    perUnit: 'R$2,00 por avaliação excedente',
+    limit: '12.000 no ano',
+    perUnit: 'Cota de 1.000/mês · R$ 0,45 por avaliação · extras até 200/mês',
     highlight: false,
     description: 'Para psicólogos e equipes com alto volume de diagnósticos.',
   },
@@ -471,7 +471,7 @@ function PlanoTab({
     : 0
   const isNearLimit = pct >= 80
   const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500'
-  const capPct = Math.min(100, Math.round((used / RESPONSES_HARD_CAP) * 100))
+  const capPct = Math.min(100, Math.round((used / usage.monthlyCap) * 100))
 
   return (
     <div className="space-y-6">
@@ -525,12 +525,12 @@ function PlanoTab({
           {usage.excess > 0 && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-xs font-semibold text-amber-800">
-                Excedente do plano: {usage.excess.toLocaleString('pt-BR')} avaliaç{usage.excess !== 1 ? 'ões' : 'ão'}
+                Avaliações extras: {usage.excess.toLocaleString('pt-BR')} de {usage.excessLimit.toLocaleString('pt-BR')} permitidas no mês (20% da cota)
               </p>
               <p className="mt-0.5 text-xs text-amber-700">
                 Cobrança adicional estimada: <span className="font-bold">
                   {usage.overageBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span> (R$ 2,00 por avaliação excedente, faturado no fechamento do mês)
+                </span> (R$ 2,00 por avaliação extra, faturado no fechamento do mês)
               </p>
             </div>
           )}
@@ -538,19 +538,19 @@ function PlanoTab({
           <div className="mt-3 border-t border-gray-100 pt-3">
             <div className="mb-1 flex items-center justify-between">
               <p className="text-[11px] text-gray-400">
-                Capacidade total do sistema ({RESPONSES_HARD_CAP.toLocaleString('pt-BR')} avaliações/mês)
+                Trava mensal do plano — cota + 20% de extras ({usage.monthlyCap.toLocaleString('pt-BR')} avaliações)
               </p>
               <span className="text-[11px] font-semibold tabular-nums text-gray-500">{capPct}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
               <div
-                className={`h-1.5 rounded-full ${usage.capReached ? 'bg-red-500' : 'bg-gray-300'}`}
+                className={`h-1.5 rounded-full ${usage.blocked ? 'bg-red-500' : capPct >= 80 ? 'bg-amber-400' : 'bg-gray-300'}`}
                 style={{ width: `${capPct}%` }}
               />
             </div>
-            {usage.capReached && (
+            {usage.blocked && (
               <p className="mt-1 text-xs text-red-600">
-                Teto mensal atingido — novas avaliações bloqueadas até o próximo ciclo.
+                Trava atingida — novas avaliações bloqueadas até a contagem reiniciar na virada do mês.
               </p>
             )}
           </div>
@@ -589,7 +589,7 @@ function PlanoTab({
               )}
               <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
                 <p className="text-xs text-gray-700">
-                  <span className="font-semibold">{plan.limit}</span> avaliações/mês
+                  <span className="font-semibold">{plan.limit}</span>
                 </p>
                 <p className="text-xs text-gray-400">{plan.perUnit}</p>
                 <p className="text-xs text-gray-400">{plan.description}</p>
@@ -628,8 +628,7 @@ function PlanoTab({
         </div>
         <p className="mt-3 text-center text-[11px] text-gray-400">
           Planos sem fidelidade. Pagamento seguro via Hotmart (cartão, PIX ou boleto) — ativação automática após a confirmação. Compre com o mesmo e-mail usado no login.
-          Excedente de R$ 2,00 por avaliação acima do plano, faturado no fechamento do mês.
-          Capacidade máxima: 6.000 avaliações/mês. Entre em contato para contratar ou tirar dúvidas.
+          Extras de R$ 2,00 por avaliação, limitados a 20% da cota mensal; atingida a trava, a contagem reinicia na virada do mês.
         </p>
       </div>
     </div>

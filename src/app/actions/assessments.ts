@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { calculateRiskScores, countManagers, MIN_RESPONDENTS_DEFAULT } from '@/lib/calculations/risk'
-import { RESPONSES_HARD_CAP } from '@/lib/billing'
+import { PLAN_RESPONSE_LIMITS, monthlyCapFor } from '@/lib/billing'
 import { FACTORS } from '@/lib/data/questions'
 
 const FIRST_QUESTION_ID = FACTORS[0].questions[0].id
@@ -30,13 +30,17 @@ const modeASchema = z.object({
   company_id: z.string().uuid(),
 })
 
-// Capacidade mensal por RESPOSTAS: o plano cobre o limite contratado (300/1200/3000);
-// o excedente é cobrado a R$ 2,00 por resposta; teto absoluto de 6.000 respostas/mês.
-// O contador zera automaticamente na virada do mês (date_trunc no banco).
+// Trava mensal por plano: cota + até 20% de extras (R$ 2,00 cada).
+// Atingida a trava, novas avaliações bloqueiam até a virada do mês.
 async function checkResponseCapacity(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  const { data: used } = await supabase.rpc('count_monthly_responses', { p_user_id: userId })
-  if ((used ?? 0) >= RESPONSES_HARD_CAP) {
-    return `Teto de ${RESPONSES_HARD_CAP.toLocaleString('pt-BR')} respostas/mês atingido. O contador zera no início do próximo mês.`
+  const [{ data: used }, { data: sub }] = await Promise.all([
+    supabase.rpc('count_monthly_responses', { p_user_id: userId }),
+    supabase.from('subscriptions').select('responses_monthly_limit').eq('user_id', userId).maybeSingle(),
+  ])
+  const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
+  const cap = monthlyCapFor(quota)
+  if ((used ?? 0) >= cap) {
+    return `Limite mensal do plano atingido (${cap.toLocaleString('pt-BR')} avaliações, já incluindo os extras). A contagem reinicia no próximo mês.`
   }
   return null
 }
@@ -258,17 +262,20 @@ export async function submitAnonymousAnswers(
   if (tokenRow.status !== 'ativo') return { error: 'Este link foi encerrado.' }
   if (new Date(tokenRow.expires_at) < new Date()) return { error: 'Este link expirou.' }
 
-  // Teto mensal de respostas do dono da avaliação (o excedente do plano é
-  // cobrado, mas o teto absoluto de 6.000 bloqueia novas respostas no mês)
+  // Trava mensal do plano do dono da avaliação (cota + extras de 20%)
   const { data: owner } = await supabase
     .from('assessments')
     .select('created_by')
     .eq('id', tokenRow.assessment_id)
     .single()
   if (owner?.created_by) {
-    const { data: used } = await supabase.rpc('count_monthly_responses', { p_user_id: owner.created_by })
-    if ((used ?? 0) >= RESPONSES_HARD_CAP) {
-      return { error: 'A coleta deste mês atingiu o limite máximo de respostas. Tente novamente no próximo mês.' }
+    const [{ data: used }, { data: sub }] = await Promise.all([
+      supabase.rpc('count_monthly_responses', { p_user_id: owner.created_by }),
+      supabase.from('subscriptions').select('responses_monthly_limit').eq('user_id', owner.created_by).maybeSingle(),
+    ])
+    const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
+    if ((used ?? 0) >= monthlyCapFor(quota)) {
+      return { error: 'A coleta deste mês atingiu o limite do plano. Novas respostas serão aceitas na virada do mês.' }
     }
   }
 

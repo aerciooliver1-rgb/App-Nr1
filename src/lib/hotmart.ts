@@ -6,6 +6,7 @@
 //   HOTMART_CLIENT_SECRET       idem
 //   HOTMART_BASIC               token Basic da API (idem)
 //   HOTMART_OFFER_MENSAL        código da oferta (off=...) do plano Mensal
+//   (cotas mensais por plano vêm de PLAN_RESPONSE_LIMITS em lib/billing)
 //   HOTMART_OFFER_SEMESTRAL     código da oferta do plano Semestral
 //   HOTMART_OFFER_ANUAL         código da oferta do plano Anual
 //   NEXT_PUBLIC_HOTMART_CHECKOUT_MENSAL     URL de checkout do plano Mensal

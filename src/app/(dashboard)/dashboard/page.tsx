@@ -4,7 +4,7 @@ import { RiskBadge } from '@/components/features/RiskBadge'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import type { RiskLevel } from '@/types'
-import { PLAN_RESPONSE_LIMITS } from '@/lib/billing'
+import { PLAN_RESPONSE_LIMITS, summarizeUsage } from '@/lib/billing'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -305,6 +305,7 @@ function PlanBanner({
 }) {
   const planType = subscription?.plan_type ?? 'trial'
   const limit = subscription?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
+  const usage = summarizeUsage(responsesThisMonth, limit)
   const used = responsesThisMonth
   const pct = Math.min(100, Math.round((used / limit) * 100))
   const barColor = usageBarColor(pct)
@@ -351,11 +352,17 @@ function PlanBanner({
               style={{ width: `${pct}%` }}
             />
           </div>
-          {isNearLimit && (
-            <p className="mt-1 text-[11px] text-amber-600">
-              {pct >= 100 ? 'Limite atingido — novas avaliações bloqueadas' : `${100 - pct}% restante do limite mensal`}
+          {usage.blocked ? (
+            <p className="mt-1 text-[11px] font-semibold text-red-600">
+              Trava mensal atingida ({usage.monthlyCap.toLocaleString('pt-BR')}) — a contagem reinicia na virada do mês
             </p>
-          )}
+          ) : usage.excess > 0 ? (
+            <p className="mt-1 text-[11px] text-amber-600">
+              {usage.excess} extra{usage.excess !== 1 ? 's' : ''} este mês ({usage.overageBRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) · até {usage.excessLimit} permitidos
+            </p>
+          ) : isNearLimit ? (
+            <p className="mt-1 text-[11px] text-amber-600">{100 - pct}% restante da cota mensal</p>
+          ) : null}
         </div>
 
         {/* Vigência */}
