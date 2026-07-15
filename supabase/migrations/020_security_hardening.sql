@@ -1,0 +1,6 @@
+-- Correções do relatório de segurança do Supabase (12/07/2026):
+-- RLS em question_meta (crítico), search_path fixo nas funções, REVOKE de
+-- RPCs sensíveis para anon/authenticated, count_monthly_responses restrito
+-- ao próprio usuário, evidences_insert com dono obrigatório e remoção da
+-- listagem pública do bucket de logos. SQL completo aplicado via painel —
+-- ver histórico de migrations remotas (security_hardening).

@@ -301,12 +301,14 @@ export async function submitAnonymousAnswers(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runRiskCalculation(assessmentId: string, supabase: any): Promise<string | null> {
   // Caminho principal: agregação dentro do Postgres (suporta 6.000+ respondentes
-  // sem transferir centenas de milhares de linhas para o app)
-  const { error: rpcError } = await supabase.rpc('calculate_risk_scores_sql', {
+  // sem transferir centenas de milhares de linhas para o app). A RPC é
+  // privilegiada (EXECUTE revogado de anon/authenticated) — roda via service role.
+  const service = await createServiceClient()
+  const { error: rpcError } = await service.rpc('calculate_risk_scores_sql', {
     p_assessment_id: assessmentId,
   })
   if (!rpcError) {
-    const { count } = await supabase
+    const { count } = await service
       .from('risk_scores')
       .select('id', { count: 'exact', head: true })
       .eq('assessment_id', assessmentId)
