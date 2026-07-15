@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Autenticação', () => {
   test('página de login carrega corretamente', async ({ page }) => {
     await page.goto('/login')
-    await expect(page).toHaveTitle(/NR-1|login/i)
+    await expect(page).toHaveTitle(/DRPS|login/i)
     await expect(page.getByLabel(/e-mail/i)).toBeVisible()
     await expect(page.getByLabel(/senha/i)).toBeVisible()
     await expect(page.getByRole('button', { name: /entrar/i })).toBeVisible()
