@@ -54,6 +54,11 @@ const programSchema = z.object({
   target_audience: z.string().optional(),
   modality: z.string().optional(),
   sessions: z.string().optional(),
+  objectives: z.string().optional(),
+  structure: z.string().optional(),
+  methodology: z.string().optional(),
+  materials: z.string().optional(),
+  indicators: z.string().optional(),
 })
 
 function extractFields(formData: FormData) {
@@ -81,6 +86,11 @@ function extractFields(formData: FormData) {
       target_audience: d.target_audience || null,
       modality: d.modality || null,
       sessions: d.sessions || null,
+      objectives: d.objectives || null,
+      structure: d.structure || null,
+      methodology: d.methodology || null,
+      materials: d.materials || null,
+      indicators: d.indicators || null,
     },
   }
 }

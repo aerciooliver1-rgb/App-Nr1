@@ -225,6 +225,36 @@ function Field({
   )
 }
 
+function TextareaField({
+  label,
+  name,
+  defaultValue,
+  placeholder,
+  hint,
+  rows = 4,
+}: {
+  label: string
+  name: string
+  defaultValue?: string | null
+  placeholder?: string
+  hint?: string
+  rows?: number
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-gray-700">{label}</label>
+      <textarea
+        name={name}
+        rows={rows}
+        defaultValue={defaultValue ?? ''}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none"
+      />
+      {hint && <p className="mt-1 text-[11px] text-gray-400">{hint}</p>}
+    </div>
+  )
+}
+
 function ProgramForm({
   program,
   action,
@@ -329,6 +359,49 @@ function ProgramForm({
         <Field label="Público-alvo" name="target_audience" defaultValue={program?.target_audience} placeholder="Ex: Gestores + equipe toda" />
         <Field label="Modalidade" name="modality" defaultValue={program?.modality} placeholder="Ex: Presencial, Online ou Híbrido" />
         <Field label="Nº de encontros" name="sessions" defaultValue={program?.sessions} placeholder="Ex: 2 encontros de 4h" />
+      </div>
+
+      {/* Etapas da intervenção — conteúdo exibido nos popups do card */}
+      <div className="space-y-4 border-t border-gray-100 pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Etapas da intervenção — exibidas nos botões do card
+        </p>
+        <TextareaField
+          label="Objetivos do programa"
+          name="objectives"
+          defaultValue={program?.objectives}
+          placeholder={'Identificar e nomear o comportamento de risco\nCapacitar gestores para prevenir e responder\nGarantir conformidade com a NR-1'}
+          hint="Um objetivo por linha."
+        />
+        <TextareaField
+          label="Estrutura e encontros"
+          name="structure"
+          defaultValue={program?.structure}
+          placeholder={'Encontro 1 — 4h (equipe toda): conceitos e casos situacionais\nEncontro 2 — 4h (gestores): protocolo e acolhimento\nEntregável: Política formalizada e assinada'}
+          hint="Uma etapa/entregável por linha."
+        />
+        <TextareaField
+          label="Metodologia e abordagem"
+          name="methodology"
+          defaultValue={program?.methodology}
+          placeholder={'Psicoeducação com casos situacionais\nRole play de situações práticas\nConstrução coletiva do protocolo'}
+          hint="Uma técnica/abordagem por linha."
+        />
+        <TextareaField
+          label="Materiais necessários"
+          name="materials"
+          defaultValue={program?.materials}
+          placeholder={'Apresentação em slides\nFichas de casos situacionais\nLista de presença para documentação'}
+          hint="Um material por linha."
+        />
+        <TextareaField
+          label="Indicadores de eficácia"
+          name="indicators"
+          defaultValue={program?.indicators}
+          placeholder={'Redução do score do fator | Comparação na reavaliação | 6 meses após o programa\nPolítica formalizada | Verificação documental | Ao final do programa'}
+          hint={'Um indicador por linha, separando as 3 colunas com " | ": Indicador | Como medir | Quando verificar'}
+          rows={3}
+        />
       </div>
 
       <div className="flex justify-end gap-2">

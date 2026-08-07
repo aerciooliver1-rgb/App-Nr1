@@ -34,7 +34,7 @@ export default async function CatalogoPage() {
     <>
       <Header title="Catálogo de Programas" />
       <div className="p-6">
-        <div className="mx-auto max-w-3xl space-y-4">
+        <div className="mx-auto max-w-5xl space-y-4">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-3 text-sm text-blue-700">
             Programas padrão ficam disponíveis para todos os usuários ao montar planos de ação.
             Apenas administradores podem criar, editar e excluir programas deste catálogo.
