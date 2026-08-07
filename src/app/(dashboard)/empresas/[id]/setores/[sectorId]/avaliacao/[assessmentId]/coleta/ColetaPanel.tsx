@@ -163,11 +163,11 @@ export function ColetaPanel({
       {isActive && (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 font-semibold text-gray-900">Link de acesso para funcionários</h3>
-          <div className="flex flex-col items-center gap-4 sm:flex-row">
+          <div className="flex flex-col items-center gap-4">
             <div className="shrink-0 rounded-xl border border-gray-200 p-3">
               <QRCodeSVG value={surveyUrl} size={160} />
             </div>
-            <div className="flex flex-col gap-2 w-full">
+            <div className="flex w-full min-w-0 flex-col gap-2">
               <p className="text-xs text-gray-500">Compartilhe este link ou mostre o QR Code:</p>
               <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                 <span className="flex-1 truncate text-xs text-gray-700 font-mono">{surveyUrl}</span>
