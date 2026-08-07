@@ -468,13 +468,13 @@ function ProgramCard({
         <InfoItem label="Encontros" value={program.sessions} />
       </div>
 
-      {/* Etapas da intervenção — abrem popup explicativo */}
-      <div className="mt-4 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3.5">
+      {/* Etapas da intervenção — abrem popup explicativo (uma única linha, com scroll horizontal se faltar espaço) */}
+      <div className="mt-4 -mx-1 flex flex-nowrap gap-1.5 overflow-x-auto border-t border-gray-100 px-1 pt-3.5 pb-0.5">
         {DETAIL_STEPS.map(step => (
           <button
             key={step.key}
             onClick={() => setOpenDetail(step.key)}
-            className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100"
           >
             <DetailIcon d={step.icon} />
             {step.label}
