@@ -12,9 +12,9 @@ const RISK_LEVELS: RiskLevel[] = ['critico', 'alto', 'moderado', 'baixo']
 
 const PLAN_LABEL: Record<string, string> = {
   trial: 'Trial',
-  mensal: 'Mensal',
-  semestral: 'Semestral',
-  anual: 'Anual',
+  mensal: 'Start',
+  semestral: 'Pro',
+  anual: 'Enterprise',
 }
 
 const PLAN_COLOR: Record<string, string> = {

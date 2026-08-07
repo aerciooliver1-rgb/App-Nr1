@@ -407,9 +407,9 @@ const PLAN_CONFIG: Record<string, {
   chip: string
 }> = {
   trial:     { label: 'Trial',     color: 'border-t-gray-400',    chip: 'bg-gray-100 text-gray-700' },
-  mensal:    { label: 'Mensal',    color: 'border-t-blue-500',    chip: 'bg-blue-100 text-blue-700' },
-  semestral: { label: 'Semestral', color: 'border-t-violet-500',  chip: 'bg-violet-100 text-violet-700' },
-  anual:     { label: 'Anual',     color: 'border-t-emerald-500', chip: 'bg-emerald-100 text-emerald-700' },
+  mensal:    { label: 'Start',      color: 'border-t-blue-500',    chip: 'bg-blue-100 text-blue-700' },
+  semestral: { label: 'Pro',        color: 'border-t-violet-500',  chip: 'bg-violet-100 text-violet-700' },
+  anual:     { label: 'Enterprise', color: 'border-t-emerald-500', chip: 'bg-emerald-100 text-emerald-700' },
 }
 
 const HOTMART_CHECKOUT: Record<string, string | undefined> = {
@@ -421,7 +421,7 @@ const HOTMART_CHECKOUT: Record<string, string | undefined> = {
 const PLANS = [
   {
     id: 'mensal',
-    name: 'Mensal',
+    name: 'Start',
     price: 'R$600',
     period: '/mês',
     limit: '300 avaliações/mês',
@@ -431,7 +431,7 @@ const PLANS = [
   },
   {
     id: 'semestral',
-    name: 'Semestral',
+    name: 'Pro',
     price: 'R$500',
     period: '/mês',
     total: 'R$3.000 cobrado a cada 6 meses',
@@ -442,7 +442,7 @@ const PLANS = [
   },
   {
     id: 'anual',
-    name: 'Anual',
+    name: 'Enterprise',
     price: 'R$450',
     period: '/mês',
     total: 'R$5.400 cobrado anualmente',
