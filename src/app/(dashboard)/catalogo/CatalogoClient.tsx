@@ -46,6 +46,138 @@ const LEVEL_CONFIG: Record<string, {
 
 const LEVEL_ORDER = ['moderado', 'alto', 'critico', 'outros']
 
+// ─── Etapas da intervenção — popup explicativo por programa ──────────────────
+
+type DetailKey = 'objectives' | 'structure' | 'methodology' | 'materials' | 'indicators'
+
+const DETAIL_STEPS: { key: DetailKey; label: string; icon: string }[] = [
+  { key: 'objectives', label: 'Objetivos', icon: 'M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' },
+  { key: 'structure', label: 'Estrutura e encontros', icon: 'M8 2v3M16 2v3M3.5 9h17M4 5h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z' },
+  { key: 'methodology', label: 'Metodologia e abordagem', icon: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z' },
+  { key: 'materials', label: 'Materiais necessários', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
+  { key: 'indicators', label: 'Indicadores', icon: 'M3 3v18h18M7 16l4-6 3 3 5-7' },
+]
+
+function DetailIcon({ d, className = 'h-4 w-4' }: { d: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d={d} />
+    </svg>
+  )
+}
+
+/** Lista de bullets — cada linha do campo (separado por \n) vira um item. */
+function BulletList({ text }: { text: string }) {
+  const items = text.split('\n').map(l => l.trim()).filter(Boolean)
+  return (
+    <ul className="space-y-2.5">
+      {items.map((item, i) => (
+        <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Indicadores — cada linha é "Indicador | Como medir | Quando verificar". */
+function IndicatorsTable({ text }: { text: string }) {
+  const rows = text.split('\n').map(l => l.trim()).filter(Boolean).map(l => l.split('|').map(c => c.trim()))
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="bg-gray-50 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-3 py-2">Indicador</th>
+            <th className="px-3 py-2">Como medir</th>
+            <th className="px-3 py-2">Quando verificar</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map((cols, i) => (
+            <tr key={i}>
+              {cols.map((c, j) => (
+                <td key={j} className={`px-3 py-2.5 align-top ${j === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ProgramDetailModal({
+  program,
+  detailKey,
+  onClose,
+}: {
+  program: ProgramRow
+  detailKey: DetailKey
+  onClose: () => void
+}) {
+  const content = program[detailKey]
+  const step = DETAIL_STEPS.find(s => s.key === detailKey)!
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              {program.code && (
+                <span className="rounded-md bg-gray-900 px-2 py-0.5 font-mono text-xs font-bold text-white">
+                  {program.code}
+                </span>
+              )}
+              <p className="text-sm font-semibold text-gray-900">{program.name}</p>
+            </div>
+            <div className="mt-2.5 flex items-center gap-2 text-blue-700">
+              <DetailIcon d={step.icon} className="h-5 w-5" />
+              <h3 className="text-lg font-bold">{step.label}</h3>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Fechar"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
+              <path d="M15 5 5 15M5 5l10 10" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="mt-5">
+          {!content ? (
+            <p className="text-sm text-gray-400">Conteúdo não cadastrado para este programa.</p>
+          ) : detailKey === 'indicators' ? (
+            <IndicatorsTable text={content} />
+          ) : (
+            <BulletList text={content} />
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-6 w-full rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Fechar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SaveButton({ label = 'Salvar' }: { label?: string }) {
   const { pending } = useFormStatus()
   return (
@@ -253,6 +385,7 @@ function ProgramCard({
   const [editing, setEditing] = useState(false)
   const [, startTransition] = useTransition()
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [openDetail, setOpenDetail] = useState<DetailKey | null>(null)
 
   const boundUpdate = updateProgram.bind(null, program.id)
   const [editState, editAction] = useActionState<ProgramFormState, FormData>(boundUpdate, undefined)
@@ -335,6 +468,20 @@ function ProgramCard({
         <InfoItem label="Encontros" value={program.sessions} />
       </div>
 
+      {/* Etapas da intervenção — abrem popup explicativo */}
+      <div className="mt-4 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3.5">
+        {DETAIL_STEPS.map(step => (
+          <button
+            key={step.key}
+            onClick={() => setOpenDetail(step.key)}
+            className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100"
+          >
+            <DetailIcon d={step.icon} />
+            {step.label}
+          </button>
+        ))}
+      </div>
+
       {deleteError && <p className="mt-2 text-xs text-red-600">{deleteError}</p>}
 
       {/* Ações */}
@@ -352,6 +499,14 @@ function ProgramCard({
           Excluir
         </button>
       </div>
+
+      {openDetail && (
+        <ProgramDetailModal
+          program={program}
+          detailKey={openDetail}
+          onClose={() => setOpenDetail(null)}
+        />
+      )}
     </li>
   )
 }

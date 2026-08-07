@@ -20,10 +20,15 @@ export interface ProgramRow {
   target_audience: string | null
   modality: string | null
   sessions: string | null
+  objectives: string | null
+  structure: string | null
+  methodology: string | null
+  materials: string | null
+  indicators: string | null
 }
 
 const PROGRAM_FIELDS =
-  'id, name, description, type, created_at, code, level, factor_ids, workload, start_deadline, target_audience, modality, sessions'
+  'id, name, description, type, created_at, code, level, factor_ids, workload, start_deadline, target_audience, modality, sessions, objectives, structure, methodology, materials, indicators'
 
 // ─── Listar programas padrão ──────────────────────────────────────────────────
 
