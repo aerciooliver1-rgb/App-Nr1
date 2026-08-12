@@ -25,19 +25,18 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* Headline + corpo */}
         <div className="flex flex-col gap-8">
           <div>
-            <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-400">
-              Diagnóstico de Riscos Psicossociais
+            <p className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-400">
+              NR-1 · Portaria MTE nº 1.419/2024
             </p>
             <h1 className="text-4xl font-bold leading-[1.15] text-white xl:text-5xl">
-              Conformidade NR-1
+              Estruture o cuidado.
               <br />
-              <span className="text-blue-400">com diagnóstico</span>
-              <br />
-              <span className="text-blue-400">preciso.</span>
+              <span className="text-blue-400">Lidere a mudança.</span>
             </h1>
             <p className="mt-6 max-w-sm text-sm leading-relaxed text-slate-400">
-              Plataforma de avaliação psicossocial baseada no Guia MTE 2025, com
-              anonimato garantido e geração automática de planos de ação NR-1.
+              Do diagnóstico ao plano de ação: transforme os 13 fatores de risco em
+              um programa de saúde mental que sua empresa sustenta no tempo — com
+              evidências, não achismos.
             </p>
           </div>
 
@@ -50,7 +49,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               </p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">55</p>
+              <p className="text-2xl font-bold text-white">50</p>
               <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
                 Questões Validadas
               </p>
@@ -66,7 +65,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         {/* Rodapé legal */}
         <p className="text-[11px] text-slate-600">
-          Portaria MTE nº 5.419/2024 · ISO 45003:2021 · Lei 13.709/2018
+          Portaria MTE nº 1.419/2024 · ISO 45003:2021 · Lei 13.709/2018
         </p>
       </div>
 
