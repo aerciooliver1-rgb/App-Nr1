@@ -29,14 +29,18 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               NR-1 · Portaria MTE nº 1.419/2024
             </p>
             <h1 className="text-4xl font-bold leading-[1.15] text-white xl:text-5xl">
-              Estruture o cuidado.
+              Avalie os riscos.
               <br />
-              <span className="text-blue-400">Lidere a mudança.</span>
+              Aplique intervenções.
+              <br />
+              <span className="mt-1 inline-block rounded-2xl bg-gradient-to-b from-blue-500 to-blue-600 px-3.5 pb-1 pt-0.5 shadow-lg shadow-blue-500/30">
+                Entregue cuidado.
+              </span>
             </h1>
             <p className="mt-6 max-w-sm text-sm leading-relaxed text-slate-400">
-              Do diagnóstico ao plano de ação: transforme os 13 fatores de risco em
-              um programa de saúde mental que sua empresa sustenta no tempo — com
-              evidências, não achismos.
+              Cumprir a NR-1 é só o começo. O DRPS transforma o diagnóstico dos 13
+              fatores em um plano estruturado de saúde mental e bem-estar — que faz
+              sentido para a liderança, para as equipes e para a realidade da empresa.
             </p>
           </div>
 
