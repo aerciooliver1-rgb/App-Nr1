@@ -69,10 +69,10 @@ export async function GET(request: NextRequest) {
   const assessmentId = request.nextUrl.searchParams.get('assessmentId')
   if (!assessmentId) return new Response('assessmentId ausente', { status: 400 })
 
-  const [{ data: assessment }, { data: scores }, { data: plan }, { data: profile }] = await Promise.all([
+  const [{ data: assessment }, { data: scores }, { data: plan }] = await Promise.all([
     supabase
       .from('assessments')
-      .select('id, mode, cycle, created_at, sectors(name, companies(name, contact_name))')
+      .select('id, mode, cycle, created_at, sectors(name, companies(name))')
       .eq('id', assessmentId)
       .single(),
     supabase
@@ -84,21 +84,13 @@ export async function GET(request: NextRequest) {
       .select('id, actions(description, responsible, due_date, type, risk_level)')
       .eq('assessment_id', assessmentId)
       .maybeSingle(),
-    supabase
-      .from('profiles')
-      .select('full_name, registro_profissional')
-      .eq('id', user.id)
-      .single(),
   ])
 
   if (!assessment) return new Response('Avaliação não encontrada', { status: 404 })
 
-  const sector = assessment.sectors as { name: string; companies: { name: string; contact_name: string | null } | null } | null
+  const sector = assessment.sectors as { name: string; companies: { name: string } | null } | null
   const companyName    = sector?.companies?.name ?? 'Empresa'
   const sectorName     = sector?.name ?? 'Setor'
-  const managerName    = sector?.companies?.contact_name ?? ''
-  const professionalName = profile?.full_name ?? (user.user_metadata?.name as string | undefined) ?? ''
-  const professionalReg  = profile?.registro_profissional ?? ''
   const dateLabel   = new Date(assessment.created_at ?? Date.now())
     .toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
 
@@ -474,111 +466,7 @@ export async function GET(request: NextRequest) {
     })
   })
 
-  // ── Slide 7: Assinaturas ─────────────────────────────────────────────────────
-  const s7 = pptx.addSlide()
-  s7.background = { color: DARK }
-  rect(s7, 0, 0, 13.33, 0.18, LEVEL_COLOR[worstLevel])
-
-  s7.addText('ASSINATURAS', {
-    x: 0.45, y: 0.35, w: 12.5, h: 0.38,
-    fontSize: 9, bold: true, color: '94a3b8', fontFace: 'Calibri',
-    charSpacing: 2, align: 'center',
-  })
-  s7.addText('Diagnóstico de Riscos Psicossociais — NR-1', {
-    x: 0.45, y: 0.73, w: 12.5, h: 0.32,
-    fontSize: 14, bold: true, color: 'ffffff', fontFace: 'Calibri', align: 'center',
-  })
-  s7.addText(`${companyName}  ·  Setor: ${sectorName}  ·  Ciclo #${assessment.cycle}  ·  ${dateLabel}`, {
-    x: 0.45, y: 1.05, w: 12.5, h: 0.32,
-    fontSize: 9, color: '475569', fontFace: 'Calibri', align: 'center',
-  })
-
-  // Caixa esquerda: Profissional Responsável
-  rect(s7, 0.45, 1.55, 6.0, 4.0, '0d1a2f')
-  s7.addTable(
-    [[{ text: 'RESPONSÁVEL PELA ELABORAÇÃO', options: { bold: true, color: 'ffffff', fill: { color: BLUE }, fontSize: 9, fontFace: 'Calibri' } }]],
-    { x: 0.45, y: 1.55, w: 6.0, border: { pt: 0, color: BLUE } },
-  )
-  // Área de assinatura (linha)
-  rect(s7, 0.85, 2.15, 5.2, 0.02, '1e3a8a')
-  s7.addText('Assinatura', {
-    x: 0.85, y: 2.18, w: 5.2, h: 0.22,
-    fontSize: 7.5, color: '475569', fontFace: 'Calibri', align: 'center',
-  })
-  rect(s7, 0.85, 2.9, 5.2, 0.02, '334155')
-  s7.addText(professionalName || '_____________________________', {
-    x: 0.85, y: 2.94, w: 5.2, h: 0.3,
-    fontSize: 10, bold: true, color: 'e2e8f0', fontFace: 'Calibri', align: 'center',
-  })
-  s7.addText(professionalReg || 'Registro Profissional', {
-    x: 0.85, y: 3.24, w: 5.2, h: 0.22,
-    fontSize: 8, color: '64748b', fontFace: 'Calibri', align: 'center',
-  })
-  s7.addText('Profissional de Saúde Ocupacional', {
-    x: 0.85, y: 3.46, w: 5.2, h: 0.22,
-    fontSize: 8, color: '475569', fontFace: 'Calibri', align: 'center',
-  })
-  rect(s7, 0.85, 4.18, 3.0, 0.02, '1e3a8a')
-  s7.addText('Data:', {
-    x: 0.85, y: 4.21, w: 1.0, h: 0.24,
-    fontSize: 8, color: '64748b', fontFace: 'Calibri',
-  })
-
-  // Caixa direita: Gestor / Responsável pela Empresa
-  rect(s7, 6.85, 1.55, 6.0, 4.0, '0d1a2f')
-  s7.addTable(
-    [[{ text: 'RESPONSÁVEL PELA EMPRESA', options: { bold: true, color: 'ffffff', fill: { color: BLUE }, fontSize: 9, fontFace: 'Calibri' } }]],
-    { x: 6.85, y: 1.55, w: 6.0, border: { pt: 0, color: BLUE } },
-  )
-  rect(s7, 7.25, 2.15, 5.2, 0.02, '1e3a8a')
-  s7.addText('Assinatura', {
-    x: 7.25, y: 2.18, w: 5.2, h: 0.22,
-    fontSize: 7.5, color: '475569', fontFace: 'Calibri', align: 'center',
-  })
-  rect(s7, 7.25, 2.9, 5.2, 0.02, '334155')
-  s7.addText(managerName || '_____________________________', {
-    x: 7.25, y: 2.94, w: 5.2, h: 0.3,
-    fontSize: 10, bold: true, color: 'e2e8f0', fontFace: 'Calibri', align: 'center',
-  })
-  s7.addText('Gestor / Representante Legal', {
-    x: 7.25, y: 3.24, w: 5.2, h: 0.22,
-    fontSize: 8, color: '64748b', fontFace: 'Calibri', align: 'center',
-  })
-  s7.addText('Responsável pela Aprovação', {
-    x: 7.25, y: 3.46, w: 5.2, h: 0.22,
-    fontSize: 8, color: '475569', fontFace: 'Calibri', align: 'center',
-  })
-  rect(s7, 7.25, 4.18, 3.0, 0.02, '1e3a8a')
-  s7.addText('Data:', {
-    x: 7.25, y: 4.21, w: 1.0, h: 0.24,
-    fontSize: 8, color: '64748b', fontFace: 'Calibri',
-  })
-
-  // Nota Gov.br
-  rect(s7, 0.45, 5.8, 12.5, 0.8, '0a1628')
-  s7.addText('ASSINATURA DIGITAL GOV.BR', {
-    x: 0.55, y: 5.85, w: 3.5, h: 0.22,
-    fontSize: 8, bold: true, color: '3b82f6', fontFace: 'Calibri',
-  })
-  s7.addText(
-    'Este documento está habilitado para assinatura digital qualificada via Gov.br (Decreto nº 8.771/2016 · Lei nº 14.063/2020). ' +
-    'Acesse assinatura.iti.br, faça login com CPF e senha Gov.br, carregue este PDF e assine digitalmente.',
-    {
-      x: 0.55, y: 6.08, w: 12.3, h: 0.46,
-      fontSize: 7.5, color: '64748b', fontFace: 'Calibri',
-    },
-  )
-
-  rect(s7, 0, 7.1, 13.33, 0.4, '020617')
-  s7.addText(
-    'NR-1  ·  Portaria MTE nº 1.419/2024  ·  ISO 45003:2021  ·  Lei 13.709/2018  ·  CONFIDENCIAL',
-    {
-      x: 0.4, y: 7.1, w: 12.5, h: 0.4,
-      fontSize: 8, color: '334155', fontFace: 'Calibri', align: 'center', valign: 'middle',
-    },
-  )
-
-  // ── Slide 8: Encerramento ────────────────────────────────────────────────────
+  // ── Slide 7: Encerramento ────────────────────────────────────────────────────
   const s8 = pptx.addSlide()
   s8.background = { color: DARK }
 
