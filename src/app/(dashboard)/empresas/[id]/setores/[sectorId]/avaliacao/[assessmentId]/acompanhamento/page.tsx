@@ -36,7 +36,17 @@ async function getData(assessmentId: string) {
   ])
 
   if (!assessment) return null
-  if (!plan) return { assessment, plan: null, actions: [] as KanbanAction[] }
+
+  if (!plan) {
+    const { data: scores } = await supabase
+      .from('risk_scores')
+      .select('level')
+      .eq('assessment_id', assessmentId)
+    const order: RiskLevel[] = ['critico', 'alto', 'moderado', 'baixo']
+    const levels = new Set((scores ?? []).map(s => s.level as RiskLevel))
+    const worstLevel = order.find(l => levels.has(l)) ?? null
+    return { assessment, plan: null, actions: [] as KanbanAction[], worstLevel }
+  }
 
   // Sincroniza ações atrasadas antes de renderizar
   await syncOverdueActions(plan.id)
@@ -54,7 +64,7 @@ async function getData(assessmentId: string) {
     factorName: a.factor_id ? factorMap.get(a.factor_id) : undefined,
   }))
 
-  return { assessment, plan, actions: enriched }
+  return { assessment, plan, actions: enriched, worstLevel: null as RiskLevel | null }
 }
 
 export default async function AcompanhamentoPage({
@@ -66,26 +76,45 @@ export default async function AcompanhamentoPage({
   const data = await getData(assessmentId)
   if (!data) notFound()
 
-  const { assessment, plan, actions } = data
+  const { assessment, plan, actions, worstLevel } = data
   const sector = assessment.sectors as { name: string; companies: { name: string } | null } | null
   const sectorName = sector?.name ?? 'Setor'
 
   if (!plan) {
+    // Só dispensa plano de verdade quando não há fator acima de "baixo" —
+    // se houver moderado/alto/crítico sem plano, é uma pendência real, não
+    // uma dispensa esperada pela regra de negócio.
+    const needsIntervention = worstLevel !== null && worstLevel !== 'baixo'
+    const isUrgent = worstLevel === 'critico' || worstLevel === 'alto'
+
     return (
       <>
         <Header title={`Acompanhamento — ${sectorName}`} />
         <div className="p-6">
           <div className="mx-auto max-w-3xl">
-            <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-8 py-14 text-center">
+            <div className={`rounded-xl border-2 border-dashed px-8 py-14 text-center ${
+              isUrgent ? 'border-red-200 bg-red-50' : needsIntervention ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'
+            }`}>
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
-                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                <svg className={`h-6 w-6 ${isUrgent ? 'text-red-500' : needsIntervention ? 'text-amber-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  {needsIntervention ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                  )}
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-gray-700">Este ciclo não tem plano de ação</h3>
-              <p className="mt-1.5 text-sm text-gray-400">
-                Score de risco baixo — intervenção não é obrigatória neste ciclo.<br />
-                Se quiser mesmo assim aplicar alguma ação preventiva, comece pelas intervenções.
+              <h3 className={`text-sm font-semibold ${isUrgent ? 'text-red-700' : needsIntervention ? 'text-amber-700' : 'text-gray-700'}`}>
+                {needsIntervention ? 'Este ciclo tem risco pendente, sem plano de ação' : 'Este ciclo não tem plano de ação'}
+              </h3>
+              <p className={`mt-1.5 text-sm ${needsIntervention ? 'text-gray-600' : 'text-gray-400'}`}>
+                {needsIntervention ? (
+                  <>Há fatores em nível <strong>{worstLevel === 'critico' ? 'crítico' : worstLevel === 'alto' ? 'alto' : 'moderado'}</strong> sem nenhuma intervenção selecionada.<br />
+                  Aplique as intervenções para gerar o plano de ação deste ciclo.</>
+                ) : (
+                  <>Score de risco baixo — intervenção não é obrigatória neste ciclo.<br />
+                  Se quiser mesmo assim aplicar alguma ação preventiva, comece pelas intervenções.</>
+                )}
               </p>
               <div className="mt-5 flex items-center justify-center gap-3">
                 <a
@@ -98,7 +127,7 @@ export default async function AcompanhamentoPage({
                   href={`/empresas/${id}/setores/${sectorId}/avaliacao/${assessmentId}/intervencoes`}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                 >
-                  + Adicionar intervenção
+                  + Aplicar intervenção
                 </a>
               </div>
             </div>
