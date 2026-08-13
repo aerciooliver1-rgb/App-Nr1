@@ -167,6 +167,9 @@ async function getDashboardData() {
   // Ciclos calculados com fator moderado+ que nunca passaram por
   // Intervenções/Plano — sem isso, "Acompanhamento" leva a um beco sem saída.
   const planAssessmentIds = new Set((planAssessmentIdsRes.data ?? []).map(p => p.assessment_id))
+  // Sem limite de itens — diferente de ações atrasadas (podem ser dezenas),
+  // esta categoria é uma falha de processo que deveria ser rara; escondê-la
+  // atrás de um corte de "top 5" derrota o propósito do alerta.
   const pendingPlans = (calculatedNoPlanRes.data ?? [])
     .filter(a => !planAssessmentIds.has(a.id))
     .map(a => ({
@@ -174,7 +177,6 @@ async function getDashboardData() {
       worst: worstRisk((a.risk_scores as { level: string }[]).map(r => r.level)),
     }))
     .filter((a): a is typeof a & { worst: RiskLevel } => !!a.worst && a.worst !== 'baixo')
-    .slice(0, 5)
 
   const totalCompanies = companiesRes.count ?? 0
   const responsesThisMonth = (responsesThisMonthRes.data as number | null) ?? 0
