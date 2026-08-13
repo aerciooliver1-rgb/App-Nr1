@@ -549,7 +549,7 @@ function DocumentacaoModal({
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <Labeled label="Gestor/Direção" value="" editableDefault />
               <Labeled label="Data" value="" type="date" editableDefault />
-              <Labeled label="Consultor/a CresceRH" value={consultantName} editableDefault />
+              <Labeled label="Consultor/a" value={consultantName} editableDefault />
               <Labeled label="Data" value={todayISO()} type="date" editableDefault />
             </div>
           </div>
