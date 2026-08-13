@@ -74,6 +74,8 @@ async function getDashboardData() {
     riskScoresRes,
     subscriptionRes,
     responsesThisMonthRes,
+    calculatedNoPlanRes,
+    planAssessmentIdsRes,
   ] = await Promise.all([
     supabase.from('companies').select('id', { count: 'exact', head: true }),
     supabase.from('actions').select('id', { count: 'exact', head: true })
@@ -126,6 +128,14 @@ async function getDashboardData() {
     user
       ? supabase.rpc('count_monthly_responses', { p_user_id: user.id })
       : Promise.resolve({ data: 0 }),
+
+    // Ciclos calculados — checados abaixo contra quais já têm plano de ação
+    supabase
+      .from('assessments')
+      .select(`id, cycle, updated_at, sectors(id, name, companies(id, name)), risk_scores(level)`)
+      .eq('status', 'calculado')
+      .order('updated_at', { ascending: false }),
+    supabase.from('action_plans').select('assessment_id'),
   ])
 
   const pipeline = { rascunho: 0, em_coleta: 0, concluido: 0, calculado: 0 }
@@ -154,6 +164,18 @@ async function getDashboardData() {
     })
     .slice(0, 5)
 
+  // Ciclos calculados com fator moderado+ que nunca passaram por
+  // Intervenções/Plano — sem isso, "Acompanhamento" leva a um beco sem saída.
+  const planAssessmentIds = new Set((planAssessmentIdsRes.data ?? []).map(p => p.assessment_id))
+  const pendingPlans = (calculatedNoPlanRes.data ?? [])
+    .filter(a => !planAssessmentIds.has(a.id))
+    .map(a => ({
+      ...a,
+      worst: worstRisk((a.risk_scores as { level: string }[]).map(r => r.level)),
+    }))
+    .filter((a): a is typeof a & { worst: RiskLevel } => !!a.worst && a.worst !== 'baixo')
+    .slice(0, 5)
+
   const totalCompanies = companiesRes.count ?? 0
   const responsesThisMonth = (responsesThisMonthRes.data as number | null) ?? 0
 
@@ -168,6 +190,7 @@ async function getDashboardData() {
     overdueActions: overdueActionsRes.data ?? [],
     expiringTokens: tokensRes.data ?? [],
     awaitingApproval,
+    pendingPlans,
     pipeline,
     actionsByStatus,
     riskDist,
@@ -212,7 +235,7 @@ function KpiCard({
   return <Link href={href} className={className}>{inner}</Link>
 }
 
-function AlertIcon({ type, className }: { type: 'overdue' | 'token' | 'approval'; className?: string }) {
+function AlertIcon({ type, className }: { type: 'overdue' | 'token' | 'approval' | 'pending-plan'; className?: string }) {
   const base = {
     viewBox: '0 0 20 20',
     fill: 'none',
@@ -235,6 +258,12 @@ function AlertIcon({ type, className }: { type: 'overdue' | 'token' | 'approval'
       <path d="M10 6.5v3.5l2.5 2.5" />
     </svg>
   )
+  if (type === 'pending-plan') return (
+    <svg {...base}>
+      <path d="M10 3L2.5 15.5h15L10 3z" />
+      <path d="M10 8.5v3M10 13.5h.01" />
+    </svg>
+  )
   return (
     <svg {...base}>
       <path d="M5 3h10a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z" />
@@ -246,7 +275,7 @@ function AlertIcon({ type, className }: { type: 'overdue' | 'token' | 'approval'
 function AlertRow({
   type, title, meta, badge, tag, tagColor, href,
 }: {
-  type: 'overdue' | 'token' | 'approval'
+  type: 'overdue' | 'token' | 'approval' | 'pending-plan'
   title: string
   meta: string[]
   badge?: React.ReactNode
@@ -254,8 +283,8 @@ function AlertRow({
   tagColor: string
   href: string | null
 }) {
-  const iconBg = { overdue: 'bg-red-50', token: 'bg-amber-50', approval: 'bg-violet-50' }
-  const iconColor = { overdue: 'text-red-500', token: 'text-amber-500', approval: 'text-violet-500' }
+  const iconBg = { overdue: 'bg-red-50', token: 'bg-amber-50', approval: 'bg-violet-50', 'pending-plan': 'bg-orange-50' }
+  const iconColor = { overdue: 'text-red-500', token: 'text-amber-500', approval: 'text-violet-500', 'pending-plan': 'text-orange-500' }
 
   const inner = (
     <div className="flex items-center gap-4 px-5 py-3.5">
@@ -401,10 +430,11 @@ export default async function DashboardPage() {
     overdueActions,
     expiringTokens,
     awaitingApproval,
+    pendingPlans,
     recentAssessments,
   } = await getDashboardData()
 
-  const totalAlerts = overdueActions.length + expiringTokens.length + awaitingApproval.length
+  const totalAlerts = overdueActions.length + expiringTokens.length + awaitingApproval.length + pendingPlans.length
 
   return (
     <>
@@ -565,6 +595,27 @@ export default async function DashboardPage() {
                       tag="Aguardando"
                       tagColor="text-violet-600"
                       href={`/aprovacao/${plan.id}`}
+                    />
+                  )
+                })}
+
+                {pendingPlans.map(a => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const sector = a.sectors as any
+                  const company = sector?.companies
+                  const href = company && sector
+                    ? `/empresas/${company.id}/setores/${sector.id}/avaliacao/${a.id}/intervencoes`
+                    : null
+                  return (
+                    <AlertRow
+                      key={a.id}
+                      type="pending-plan"
+                      title="Ciclo com risco pendente, sem plano de ação"
+                      meta={[company?.name ?? '—', sector?.name ?? '—', `Ciclo #${a.cycle}`]}
+                      badge={<RiskBadge level={a.worst} />}
+                      tag="Aplicar intervenção"
+                      tagColor="text-orange-600"
+                      href={href}
                     />
                   )
                 })}
