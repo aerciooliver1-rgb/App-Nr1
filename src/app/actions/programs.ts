@@ -25,10 +25,14 @@ export interface ProgramRow {
   methodology: string | null
   materials: string | null
   indicators: string | null
+  score_range: string | null
+  deliverable_title: string | null
+  deliverable_content_label: string | null
+  deliverable_content_fields: string | null
 }
 
 const PROGRAM_FIELDS =
-  'id, name, description, type, created_at, code, level, factor_ids, workload, start_deadline, target_audience, modality, sessions, objectives, structure, methodology, materials, indicators'
+  'id, name, description, type, created_at, code, level, factor_ids, workload, start_deadline, target_audience, modality, sessions, objectives, structure, methodology, materials, indicators, score_range, deliverable_title, deliverable_content_label, deliverable_content_fields'
 
 // ─── Listar programas padrão ──────────────────────────────────────────────────
 
@@ -38,6 +42,7 @@ export async function listPadraoPrograms(): Promise<ProgramRow[]> {
     .from('programs')
     .select(PROGRAM_FIELDS)
     .eq('type', 'padrao')
+    .eq('active', true)
     .order('code')
   return (data ?? []) as ProgramRow[]
 }

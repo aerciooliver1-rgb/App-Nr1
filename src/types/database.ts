@@ -541,6 +541,7 @@ export type Database = {
       }
       programs: {
         Row: {
+          active: boolean
           code: string | null
           indicators: string | null
           materials: string | null
@@ -549,6 +550,10 @@ export type Database = {
           partner_profile: string | null
           reference_norms: string | null
           structure: string | null
+          score_range: string | null
+          deliverable_title: string | null
+          deliverable_content_label: string | null
+          deliverable_content_fields: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -565,6 +570,7 @@ export type Database = {
           workload: string | null
         }
         Insert: {
+          active?: boolean
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -576,6 +582,10 @@ export type Database = {
           partner_profile?: string | null
           reference_norms?: string | null
           structure?: string | null
+          score_range?: string | null
+          deliverable_title?: string | null
+          deliverable_content_label?: string | null
+          deliverable_content_fields?: string | null
           factor_ids?: string | null
           level?: string | null
           modality?: string | null
@@ -589,6 +599,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          active?: boolean
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -600,6 +611,10 @@ export type Database = {
           partner_profile?: string | null
           reference_norms?: string | null
           structure?: string | null
+          score_range?: string | null
+          deliverable_title?: string | null
+          deliverable_content_label?: string | null
+          deliverable_content_fields?: string | null
           factor_ids?: string | null
           level?: string | null
           modality?: string | null

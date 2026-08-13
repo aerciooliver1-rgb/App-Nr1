@@ -104,7 +104,11 @@ export function IntervencoesClient({
     })
   }
 
-  const currentPrograms = activeTab === 'meus' ? meusPrograms : catalogoPrograms
+  const selectedFactorData = factors.find(f => f.id === selectedFactor)
+  const currentPrograms =
+    activeTab === 'meus'
+      ? meusPrograms
+      : catalogoPrograms.filter(p => !p.factor_ids || p.factor_ids === selectedFactor)
 
   return (
     <div className="flex flex-col gap-6">
@@ -241,10 +245,16 @@ export function IntervencoesClient({
                     </p>
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {currentPrograms.map(program => {
+                      {[...currentPrograms]
+                        .sort((a, b) =>
+                          (b.level === selectedFactorData?.level ? 1 : 0) -
+                          (a.level === selectedFactorData?.level ? 1 : 0),
+                        )
+                        .map(program => {
                         const selected = isSelected(selectedFactor, program.id)
                         const key = `${selectedFactor}-${program.id}`
                         const isToggling = toggling === key
+                        const recommended = activeTab === 'catalogo' && program.level === selectedFactorData?.level
 
                         return (
                           <button
@@ -254,6 +264,8 @@ export function IntervencoesClient({
                             className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:opacity-50 ${
                               selected
                                 ? 'border-green-400 bg-green-50'
+                                : recommended
+                                ? 'border-blue-300 bg-blue-50/50 hover:border-blue-400'
                                 : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                             }`}
                           >
@@ -261,7 +273,23 @@ export function IntervencoesClient({
                               {selected ? '✓' : '○'}
                             </span>
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{program.name}</p>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {program.level && (
+                                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                                    program.level === 'critico' ? 'bg-red-100 text-red-700'
+                                    : program.level === 'alto' ? 'bg-orange-100 text-orange-700'
+                                    : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {program.level}
+                                  </span>
+                                )}
+                                {recommended && (
+                                  <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                    Recomendado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-sm font-medium text-gray-900">{program.name}</p>
                               {program.description && (
                                 <p className="text-xs text-gray-500">{program.description}</p>
                               )}

@@ -26,8 +26,9 @@ async function getData(assessmentId: string, userId: string) {
         .eq('assessment_id', assessmentId),
       supabase
         .from('programs')
-        .select('id, name, description, type')
-        .or(`type.eq.padrao,and(type.eq.personalizado,created_by.eq.${userId})`),
+        .select('id, name, description, type, factor_ids, level')
+        .or(`type.eq.padrao,and(type.eq.personalizado,created_by.eq.${userId})`)
+        .or('active.eq.true,type.eq.personalizado'),
     ])
 
   return { assessment, scores: scores ?? [], interventions: interventions ?? [], programs: programs ?? [] }

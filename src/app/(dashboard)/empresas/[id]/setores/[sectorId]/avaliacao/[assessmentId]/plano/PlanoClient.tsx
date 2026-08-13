@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition, useRef } from 'react'
 import { RiskBadge } from '@/components/features/RiskBadge'
 import { addAction, updateAction, deleteAction, finalizePlan } from '@/app/actions/plans'
-import type { ActionRow } from './page'
+import type { ActionRow, DocProgram } from './page'
 import type { RiskLevel } from '@/types/database'
 
 interface Props {
@@ -14,6 +14,10 @@ interface Props {
   sectorId: string
   initialActions: ActionRow[]
   factorMap: Record<string, string>
+  companyName: string
+  consultantName: string
+  consultantCRP: string
+  programByFactorLevel: Record<string, DocProgram>
 }
 
 export function PlanoClient({
@@ -24,6 +28,10 @@ export function PlanoClient({
   sectorId,
   initialActions,
   factorMap,
+  companyName,
+  consultantName,
+  consultantCRP,
+  programByFactorLevel,
 }: Props) {
   const [actions, setActions] = useState<ActionRow[]>(initialActions)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -215,6 +223,14 @@ export function PlanoClient({
               isDeleting={deletingId === action.id}
               onFieldBlur={handleFieldBlur}
               onDelete={handleDelete}
+              docProgram={
+                action.factor_id && action.risk_level && action.risk_level !== 'baixo'
+                  ? programByFactorLevel[`${action.factor_id}-${action.risk_level}`]
+                  : undefined
+              }
+              companyName={companyName}
+              consultantName={consultantName}
+              consultantCRP={consultantCRP}
             />
           ))}
         </div>
@@ -260,6 +276,10 @@ function ActionCard({
   isDeleting,
   onFieldBlur,
   onDelete,
+  docProgram,
+  companyName,
+  consultantName,
+  consultantCRP,
 }: {
   action: ActionRow
   factorName?: string
@@ -267,7 +287,12 @@ function ActionCard({
   isDeleting: boolean
   onFieldBlur: (id: string, field: 'description' | 'responsible' | 'due_date', value: string) => void
   onDelete: (id: string) => void
+  docProgram?: DocProgram
+  companyName: string
+  consultantName: string
+  consultantCRP: string
 }) {
+  const [showDoc, setShowDoc] = useState(false)
   const descRef = useRef<HTMLInputElement>(null)
   const respRef = useRef<HTMLInputElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
@@ -344,7 +369,7 @@ function ActionCard({
             }`}
           />
         </div>
-        <div className="flex items-end">
+        <div className="flex items-end justify-between gap-2">
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
             action.status === 'concluida' ? 'bg-green-100 text-green-700'
             : action.status === 'atrasada' ? 'bg-red-100 text-red-700'
@@ -353,8 +378,224 @@ function ActionCard({
           }`}>
             {action.status.replace('_', ' ')}
           </span>
+          {docProgram && (
+            <button
+              onClick={() => setShowDoc(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-100"
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-3.5 w-3.5">
+                <path d="M6 2h6l4 4v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 16V3.5A1.5 1.5 0 0 1 5.5 2z" strokeLinejoin="round" />
+                <path d="M12 2v4h4M7 10h6M7 13h6" strokeLinecap="round" />
+              </svg>
+              Documentação
+            </button>
+          )}
         </div>
       </div>
+
+      {showDoc && docProgram && (
+        <DocumentacaoModal
+          program={docProgram}
+          companyName={companyName}
+          consultantName={consultantName}
+          consultantCRP={consultantCRP}
+          responsavel={action.responsible}
+          prazo={action.due_date}
+          onClose={() => setShowDoc(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Documentação — modelo de entregável pronto para preencher e imprimir ─────
+
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function todayBR() {
+  const [y, m, d] = todayISO().split('-')
+  return `${d}/${m}/${y}`
+}
+
+/** Divide uma linha do modelo em sub-campos "Rótulo: valor" separados por 2+ espaços. */
+function parseFieldLine(line: string): { label: string | null; isDate: boolean }[] {
+  const segments = line.split(/\s{2,}/).filter(Boolean)
+  return segments.map(seg => {
+    const m = seg.match(/^(.+?):\s*(.*)$/)
+    const label = m ? m[1].trim() : null
+    const rest = m ? m[2] : seg
+    const isDate = /_\/_|__\/__|\d\/\d/.test(rest) || /^_+\/_+\/_+$/.test(rest.trim())
+    return { label, isDate }
+  })
+}
+
+function DocumentacaoModal({
+  program,
+  companyName,
+  consultantName,
+  consultantCRP,
+  responsavel,
+  prazo,
+  onClose,
+}: {
+  program: DocProgram
+  companyName: string
+  consultantName: string
+  consultantCRP: string
+  responsavel: string
+  prazo: string
+  onClose: () => void
+}) {
+  const fieldLines = (program.deliverable_content_fields ?? '').split('\n').filter(Boolean)
+  const [values, setValues] = useState<Record<string, string>>({})
+
+  function setValue(key: string, v: string) {
+    setValues(prev => ({ ...prev, [key]: v }))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-xl">
+        {/* Barra de ações — some na impressão */}
+        <div className="no-print flex items-center justify-between gap-3 border-b border-gray-100 px-6 py-4">
+          <h3 className="font-semibold text-gray-900">Documentação do entregável</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                <path d="M6 8V3h8v5M6 17h8v-5H6v5zM4 13h12a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1z" strokeLinejoin="round" />
+              </svg>
+              Imprimir
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Fechar"
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
+                <path d="M15 5 5 15M5 5l10 10" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Documento — área impressa */}
+        <div className="print-area overflow-y-auto px-6 py-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {program.code} — Modelo de entregável
+          </p>
+          <h4 className="mt-1 text-lg font-bold text-gray-900">{program.deliverable_title}</h4>
+
+          {/* Identificação */}
+          <div className="mt-5 space-y-2 border-t border-gray-100 pt-4 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Identificação</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              <Labeled label="Empresa" value={companyName} />
+              <Labeled label="Data" value={todayBR()} />
+              <Labeled label="Programa" value={`${program.code} — ${program.name}`} span2 />
+              <Labeled label="Consultor/a responsável" value={consultantName} />
+              <Labeled label="CRP (se aplicável)" value={consultantCRP} />
+            </div>
+          </div>
+
+          {/* Conteúdo específico do entregável */}
+          <div className="mt-5 space-y-3 border-t border-gray-100 pt-4 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              {program.deliverable_content_label}
+            </p>
+            {fieldLines.map((line, i) => {
+              const segments = parseFieldLine(line)
+              return (
+                <div key={i} className="flex flex-wrap gap-3">
+                  {segments.map((seg, j) => {
+                    const key = `${i}-${j}`
+                    return (
+                      <div key={key} className="flex-1 min-w-[140px]">
+                        {seg.label && (
+                          <label className="mb-0.5 block text-xs font-medium text-gray-500">{seg.label}</label>
+                        )}
+                        <input
+                          type={seg.isDate ? 'date' : 'text'}
+                          value={values[key] ?? ''}
+                          onChange={e => setValue(key, e.target.value)}
+                          className="w-full border-b border-gray-300 bg-transparent py-1 text-sm text-gray-800 focus:border-blue-500 focus:outline-none print:border-b print:border-gray-400"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Responsáveis e prazos */}
+          <div className="mt-5 space-y-2 border-t border-gray-100 pt-4 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Responsáveis e prazos</p>
+            <Labeled label="Responsável pela implementação" value={responsavel} editableDefault />
+            <div className="grid grid-cols-2 gap-x-4">
+              <Labeled label="Prazo de implementação" value={prazo} type="date" editableDefault />
+              <Labeled label="Data de verificação na plataforma" value="" type="date" editableDefault />
+            </div>
+          </div>
+
+          {/* Assinaturas */}
+          <div className="mt-5 space-y-3 border-t border-gray-100 pt-4 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Assinaturas</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <Labeled label="Gestor/Direção" value="" editableDefault />
+              <Labeled label="Data" value="" type="date" editableDefault />
+              <Labeled label="Consultor/a CresceRH" value={consultantName} editableDefault />
+              <Labeled label="Data" value={todayISO()} type="date" editableDefault />
+            </div>
+          </div>
+        </div>
+
+        <div className="no-print flex justify-end border-t border-gray-100 px-6 py-3">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Campo rotulado do documento: readonly quando `value` vem de dados já conhecidos; editável quando `editableDefault`. */
+function Labeled({
+  label,
+  value,
+  type = 'text',
+  span2 = false,
+  editableDefault = false,
+}: {
+  label: string
+  value: string
+  type?: 'text' | 'date'
+  span2?: boolean
+  editableDefault?: boolean
+}) {
+  const [v, setV] = useState(value)
+  return (
+    <div className={span2 ? 'col-span-2' : ''}>
+      <label className="mb-0.5 block text-xs font-medium text-gray-500">{label}</label>
+      {editableDefault ? (
+        <input
+          type={type}
+          value={v}
+          onChange={e => setV(e.target.value)}
+          className="w-full border-b border-gray-300 bg-transparent py-1 text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
+        />
+      ) : (
+        <p className="border-b border-gray-200 py-1 text-sm text-gray-800">{value || '—'}</p>
+      )}
     </div>
   )
 }

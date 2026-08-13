@@ -19,7 +19,15 @@ export interface ActionRow {
   risk_level: RiskLevel | null
 }
 
-async function getData(assessmentId: string) {
+export interface DocProgram {
+  code: string | null
+  name: string
+  deliverable_title: string | null
+  deliverable_content_label: string | null
+  deliverable_content_fields: string | null
+}
+
+async function getData(assessmentId: string, companyId: string, userId: string) {
   const supabase = await createClient()
 
   const { data: plan } = await supabase
@@ -30,10 +38,19 @@ async function getData(assessmentId: string) {
 
   if (!plan) return null
 
-  const { data: actions } = await supabase
-    .from('actions')
-    .select('id, plan_id, description, responsible, due_date, type, status, factor_id, risk_level')
-    .eq('plan_id', plan.id)
+  const [{ data: actions }, { data: company }, { data: profile }, { data: programs }] = await Promise.all([
+    supabase
+      .from('actions')
+      .select('id, plan_id, description, responsible, due_date, type, status, factor_id, risk_level')
+      .eq('plan_id', plan.id),
+    supabase.from('companies').select('name').eq('id', companyId).single(),
+    supabase.from('profiles').select('full_name, registro_profissional').eq('id', userId).single(),
+    supabase
+      .from('programs')
+      .select('factor_ids, level, code, name, deliverable_title, deliverable_content_label, deliverable_content_fields')
+      .eq('type', 'padrao')
+      .eq('active', true),
+  ])
 
   const sorted = (actions ?? []).sort((a, b) => {
     const la = RISK_ORDER[a.risk_level as RiskLevel] ?? 0
@@ -41,7 +58,26 @@ async function getData(assessmentId: string) {
     return lb - la
   })
 
-  return { plan, actions: sorted as ActionRow[] }
+  const programByFactorLevel: Record<string, DocProgram> = {}
+  for (const p of programs ?? []) {
+    if (!p.factor_ids || !p.level) continue
+    programByFactorLevel[`${p.factor_ids}-${p.level}`] = {
+      code: p.code,
+      name: p.name,
+      deliverable_title: p.deliverable_title,
+      deliverable_content_label: p.deliverable_content_label,
+      deliverable_content_fields: p.deliverable_content_fields,
+    }
+  }
+
+  return {
+    plan,
+    actions: sorted as ActionRow[],
+    companyName: company?.name ?? '',
+    consultantName: profile?.full_name ?? '',
+    consultantCRP: profile?.registro_profissional ?? '',
+    programByFactorLevel,
+  }
 }
 
 export default async function PlanoPage({
@@ -50,10 +86,14 @@ export default async function PlanoPage({
   params: Promise<{ id: string; sectorId: string; assessmentId: string }>
 }) {
   const { id, sectorId, assessmentId } = await params
-  const data = await getData(assessmentId)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
+
+  const data = await getData(assessmentId, id, user.id)
   if (!data) notFound()
 
-  const { plan, actions } = data
+  const { plan, actions, companyName, consultantName, consultantCRP, programByFactorLevel } = data
   const factorMap = new Map(FACTORS.map(f => [f.id, f.name]))
 
   return (
@@ -69,6 +109,10 @@ export default async function PlanoPage({
             sectorId={sectorId}
             initialActions={actions}
             factorMap={Object.fromEntries(factorMap)}
+            companyName={companyName}
+            consultantName={consultantName}
+            consultantCRP={consultantCRP}
+            programByFactorLevel={programByFactorLevel}
           />
         </div>
       </div>

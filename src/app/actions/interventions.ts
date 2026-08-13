@@ -55,6 +55,8 @@ export interface Program {
   name: string
   description: string | null
   type: 'padrao' | 'personalizado'
+  factor_ids: string | null
+  level: string | null
 }
 
 export async function createCustomProgram(
@@ -76,7 +78,7 @@ export async function createCustomProgram(
       type: 'personalizado',
       created_by: user.id,
     })
-    .select('id, name, description, type')
+    .select('id, name, description, type, factor_ids, level')
     .single()
 
   if (error || !data) return { message: 'Erro ao criar programa.' }
@@ -88,6 +90,8 @@ export async function createCustomProgram(
       name: data.name,
       description: data.description,
       type: 'personalizado',
+      factor_ids: data.factor_ids,
+      level: data.level,
     },
   }
 }

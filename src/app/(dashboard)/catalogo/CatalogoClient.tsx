@@ -54,7 +54,7 @@ const DETAIL_STEPS: { key: DetailKey; label: string; icon: string }[] = [
   { key: 'objectives', label: 'Objetivos', icon: 'M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4z' },
   { key: 'structure', label: 'Estrutura e encontros', icon: 'M8 2v3M16 2v3M3.5 9h17M4 5h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z' },
   { key: 'methodology', label: 'Metodologia e abordagem', icon: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z' },
-  { key: 'materials', label: 'Materiais necessários', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
+  { key: 'materials', label: 'Entregáveis', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
   { key: 'indicators', label: 'Indicadores', icon: 'M3 3v18h18M7 16l4-6 3 3 5-7' },
 ]
 
@@ -166,6 +166,18 @@ function ProgramDetailModal({
             <BulletList text={content} />
           )}
         </div>
+
+        {detailKey === 'materials' && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg bg-blue-50 px-3.5 py-3 text-xs leading-relaxed text-blue-700">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" className="mt-0.5 h-4 w-4 shrink-0">
+              <path d="M10 13.5v-3M10 6.75h.01M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>
+              O modelo de entregável pronto para preencher fica disponível na página de{' '}
+              <strong className="font-semibold">Plano de Ação</strong>, no botão &ldquo;Documentação&rdquo; de cada ação.
+            </span>
+          </div>
+        )}
 
         <button
           onClick={onClose}
@@ -388,11 +400,11 @@ function ProgramForm({
           hint="Uma técnica/abordagem por linha."
         />
         <TextareaField
-          label="Materiais necessários"
+          label="Entregáveis"
           name="materials"
           defaultValue={program?.materials}
-          placeholder={'Apresentação em slides\nFichas de casos situacionais\nLista de presença para documentação'}
-          hint="Um material por linha."
+          placeholder={'Cartaz "O que não toleramos aqui" para afixar\nRegistro de presença para o PGR'}
+          hint="Um entregável por linha — o que a intervenção produz de concreto."
         />
         <TextareaField
           label="Indicadores de eficácia"
@@ -533,12 +545,13 @@ function ProgramCard({
       )}
 
       {/* Ficha técnica */}
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-gray-50 px-4 py-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-gray-50 px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
         <InfoItem label="Carga Horária" value={program.workload} />
         <InfoItem label="Prazo de Início" value={program.start_deadline} />
         <InfoItem label="Público-alvo" value={program.target_audience} />
         <InfoItem label="Modalidade" value={program.modality} />
-        <InfoItem label="Encontros" value={program.sessions} />
+        <InfoItem label="Formato" value={program.sessions} />
+        <InfoItem label="Faixa de Score" value={program.score_range} />
       </div>
 
       {/* Etapas da intervenção — abrem popup explicativo (uma única linha, com scroll horizontal se faltar espaço) */}
