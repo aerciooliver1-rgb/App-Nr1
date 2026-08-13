@@ -55,8 +55,10 @@ export function IntervencoesClient({
   const [planError, setPlanError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const criticalAndHigh = factors.filter(f => f.level === 'critico' || f.level === 'alto')
-  const missingInterventions = criticalAndHigh.filter(f => !(interventions[f.id]?.length > 0))
+  // O catálogo de 39 programas cobre Moderado (prevenção), Alto e Crítico —
+  // só o nível Baixo dispensa intervenção.
+  const factorsNeedingIntervention = factors.filter(f => f.level !== 'baixo')
+  const missingInterventions = factorsNeedingIntervention.filter(f => !(interventions[f.id]?.length > 0))
   const canAdvance = missingInterventions.length === 0
   const withInterventionCount = factors.filter(f => interventions[f.id]?.length > 0).length
 
@@ -96,7 +98,7 @@ export function IntervencoesClient({
         {!canAdvance && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-semibold text-amber-800">
-              Atenção: {missingInterventions.length} fator(es) crítico(s)/alto(s) sem intervenção selecionada
+              Atenção: {missingInterventions.length} fator(es) sem intervenção selecionada
             </p>
             <ul className="mt-1 list-disc pl-4 text-xs text-amber-700">
               {missingInterventions.map(f => <li key={f.id}>{f.name}</li>)}
@@ -109,7 +111,7 @@ export function IntervencoesClient({
       <div className="flex flex-col gap-3">
         {factors.map(f => {
           const count = interventions[f.id]?.length ?? 0
-          const needsIntervention = f.level === 'critico' || f.level === 'alto'
+          const needsIntervention = f.level !== 'baixo'
           const isMissing = needsIntervention && count === 0
 
           return (
@@ -160,7 +162,7 @@ export function IntervencoesClient({
         <button
           onClick={handleAdvance}
           disabled={!canAdvance || isPending}
-          title={!canAdvance ? 'Selecione intervenções para todos os fatores críticos/altos' : ''}
+          title={!canAdvance ? 'Selecione intervenções para todos os fatores com risco (exceto Baixo)' : ''}
           className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
         >
           {isPending ? 'Gerando plano…' : 'Avançar para Plano de Ação →'}
