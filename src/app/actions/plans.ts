@@ -23,17 +23,7 @@ export async function initializePlan(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado.' }
-
-  // Se já existe, apenas navega
-  const { data: existing } = await supabase
-    .from('action_plans')
-    .select('id')
-    .eq('assessment_id', assessmentId)
-    .maybeSingle()
-
-  if (existing) {
-    redirect(`/empresas/${companyId}/setores/${sectorId}/avaliacao/${assessmentId}/plano`)
-  }
+  const userId = user.id
 
   // Busca intervenções com programa associado
   const { data: interventions } = await supabase
@@ -49,6 +39,54 @@ export async function initializePlan(
 
   const scoreMap = new Map(scores?.map(s => [s.factor_id, s.level as RiskLevel]) ?? [])
 
+  function buildRow(inv: { factor_id: string; programs: unknown }, planId: string) {
+    const level: RiskLevel = scoreMap.get(inv.factor_id) ?? 'moderado'
+    const today = new Date()
+    const due = new Date(today)
+    due.setDate(today.getDate() + DAYS_BY_LEVEL[level])
+    const programName = (inv.programs as { name: string } | null)?.name ?? 'Programa'
+
+    return {
+      plan_id: planId,
+      description: `Implementar: ${programName}`,
+      responsible: '',
+      due_date: due.toISOString().split('T')[0],
+      type: (['critico', 'alto'] as RiskLevel[]).includes(level)
+        ? ('corretiva' as ActionType)
+        : ('preventiva' as ActionType),
+      factor_id: inv.factor_id,
+      risk_level: level,
+      created_by: userId,
+    }
+  }
+
+  // Se já existe um plano, sincroniza ações que faltam (intervenções
+  // selecionadas depois da primeira visita não geravam ação nenhuma antes)
+  const { data: existing } = await supabase
+    .from('action_plans')
+    .select('id')
+    .eq('assessment_id', assessmentId)
+    .maybeSingle()
+
+  if (existing) {
+    if (interventions && interventions.length > 0) {
+      const { data: existingActions } = await supabase
+        .from('actions')
+        .select('description')
+        .eq('plan_id', existing.id)
+      const existingDescriptions = new Set((existingActions ?? []).map(a => a.description))
+
+      const missingRows = interventions
+        .map(inv => buildRow(inv, existing.id))
+        .filter(row => !existingDescriptions.has(row.description))
+
+      if (missingRows.length > 0) {
+        await supabase.from('actions').insert(missingRows)
+      }
+    }
+    redirect(`/empresas/${companyId}/setores/${sectorId}/avaliacao/${assessmentId}/plano`)
+  }
+
   // Cria o plano
   const { data: plan, error: planErr } = await supabase
     .from('action_plans')
@@ -60,27 +98,7 @@ export async function initializePlan(
 
   // Gera ações automaticamente a partir das intervenções
   if (interventions && interventions.length > 0) {
-    const today = new Date()
-    const rows = interventions.map(inv => {
-      const level: RiskLevel = scoreMap.get(inv.factor_id) ?? 'moderado'
-      const due = new Date(today)
-      due.setDate(today.getDate() + DAYS_BY_LEVEL[level])
-      const programName = (inv.programs as { name: string } | null)?.name ?? 'Programa'
-
-      return {
-        plan_id: plan.id,
-        description: `Implementar: ${programName}`,
-        responsible: '',
-        due_date: due.toISOString().split('T')[0],
-        type: (['critico', 'alto'] as RiskLevel[]).includes(level)
-          ? ('corretiva' as ActionType)
-          : ('preventiva' as ActionType),
-        factor_id: inv.factor_id,
-        risk_level: level,
-        created_by: user.id,
-      }
-    })
-
+    const rows = interventions.map(inv => buildRow(inv, plan.id))
     await supabase.from('actions').insert(rows)
   }
 
