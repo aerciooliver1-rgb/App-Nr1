@@ -22,6 +22,7 @@ export interface ActionRow {
 export interface DocProgram {
   code: string | null
   name: string
+  level: RiskLevel | null
   deliverable_title: string | null
   deliverable_content_label: string | null
   deliverable_content_fields: string | null
@@ -64,6 +65,7 @@ async function getData(assessmentId: string, companyId: string, userId: string) 
     programByFactorLevel[`${p.factor_ids}-${p.level}`] = {
       code: p.code,
       name: p.name,
+      level: p.level as RiskLevel,
       deliverable_title: p.deliverable_title,
       deliverable_content_label: p.deliverable_content_label,
       deliverable_content_fields: p.deliverable_content_fields,

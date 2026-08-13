@@ -396,6 +396,7 @@ function ActionCard({
       {showDoc && docProgram && (
         <DocumentacaoModal
           program={docProgram}
+          factorName={factorName}
           companyName={companyName}
           consultantName={consultantName}
           consultantCRP={consultantCRP}
@@ -432,8 +433,15 @@ function parseFieldLine(line: string): { label: string | null; isDate: boolean }
   })
 }
 
+const LEVEL_HEADER: Record<string, { bar: string; tint: string; text: string; badge: string }> = {
+  critico:  { bar: 'bg-red-600',    tint: 'bg-red-50',    text: 'text-red-700',    badge: 'bg-red-600 text-white' },
+  alto:     { bar: 'bg-orange-500', tint: 'bg-orange-50', text: 'text-orange-700', badge: 'bg-orange-500 text-white' },
+  moderado: { bar: 'bg-amber-500',  tint: 'bg-amber-50',  text: 'text-amber-700',  badge: 'bg-amber-500 text-white' },
+}
+
 function DocumentacaoModal({
   program,
+  factorName,
   companyName,
   consultantName,
   consultantCRP,
@@ -442,6 +450,7 @@ function DocumentacaoModal({
   onClose,
 }: {
   program: DocProgram
+  factorName?: string
   companyName: string
   consultantName: string
   consultantCRP: string
@@ -485,14 +494,38 @@ function DocumentacaoModal({
         </div>
 
         {/* Documento — área impressa */}
-        <div className="print-area overflow-y-auto px-6 py-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            {program.code} — Modelo de entregável
-          </p>
-          <h4 className="mt-1 text-lg font-bold text-gray-900">{program.deliverable_title}</h4>
+        <div className="print-area overflow-y-auto">
+          {/* Cabeçalho — colorido conforme o nível de risco do fator, ao estilo dos exports PPTX/PDF */}
+          {(() => {
+            const lvl = program.level ? LEVEL_HEADER[program.level] : null
+            return (
+              <div>
+                <div className={`h-1.5 ${lvl?.bar ?? 'bg-gray-300'}`} />
+                <div className={`px-6 py-4 ${lvl?.tint ?? 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-2">
+                    {program.code && (
+                      <span className="rounded-md bg-gray-900 px-2 py-0.5 font-mono text-xs font-bold text-white">
+                        {program.code}
+                      </span>
+                    )}
+                    {program.level && (
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${lvl?.badge}`}>
+                        {program.level}
+                      </span>
+                    )}
+                    {factorName && (
+                      <span className={`text-xs font-medium ${lvl?.text ?? 'text-gray-500'}`}>{factorName}</span>
+                    )}
+                  </div>
+                  <h4 className="mt-1.5 text-lg font-bold text-gray-900">{program.deliverable_title}</h4>
+                </div>
+              </div>
+            )
+          })()}
 
+          <div className="px-6 py-5">
           {/* Identificação */}
-          <div className="mt-5 space-y-2 border-t border-gray-100 pt-4 text-sm">
+          <div className="space-y-2 text-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Identificação</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <Labeled label="Empresa" value={companyName} />
@@ -552,6 +585,7 @@ function DocumentacaoModal({
               <Labeled label="Consultor/a" value={consultantName} editableDefault />
               <Labeled label="Data" value={todayISO()} type="date" editableDefault />
             </div>
+          </div>
           </div>
         </div>
 

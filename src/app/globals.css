@@ -41,6 +41,11 @@ body {
     box-shadow: none !important;
     border: none !important;
   }
+  .print-area,
+  .print-area * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .no-print {
     display: none !important;
   }
