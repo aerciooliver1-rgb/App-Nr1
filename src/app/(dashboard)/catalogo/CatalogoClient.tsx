@@ -17,34 +17,43 @@ import { FACTORS } from '@/lib/data/questions'
 const LEVEL_CONFIG: Record<string, {
   label: string
   deadline: string
+  summary: string
   headerClass: string
   badgeClass: string
   cardBorder: string
+  dotClass: string
 }> = {
   critico: {
     label: 'Crítico',
     deadline: 'início em até 30 dias',
+    summary: 'Resposta intensiva e urgente',
     headerClass: 'text-red-700',
     badgeClass: 'bg-red-100 text-red-700',
     cardBorder: 'border-l-red-500',
+    dotClass: 'bg-red-500',
   },
   alto: {
     label: 'Alto',
     deadline: 'início em até 90 dias',
+    summary: 'Intervenção estruturada',
     headerClass: 'text-orange-700',
     badgeClass: 'bg-orange-100 text-orange-700',
     cardBorder: 'border-l-orange-400',
+    dotClass: 'bg-orange-400',
   },
   moderado: {
     label: 'Moderado',
     deadline: 'início em até 6 meses',
+    summary: 'Prevenção',
     headerClass: 'text-amber-700',
     badgeClass: 'bg-amber-100 text-amber-800',
     cardBorder: 'border-l-amber-400',
+    dotClass: 'bg-amber-400',
   },
 }
 
 const LEVEL_ORDER = ['moderado', 'alto', 'critico', 'outros']
+const LEVEL_CARD_ORDER = ['moderado', 'alto', 'critico'] as const
 
 // ─── Etapas da intervenção — popup explicativo por programa ──────────────────
 
@@ -602,6 +611,7 @@ function ProgramCard({
 export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRow[] }) {
   const [programs, setPrograms] = useState<ProgramRow[]>(initialPrograms)
   const [showForm, setShowForm] = useState(false)
+  const [openLevel, setOpenLevel] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => setPrograms(initialPrograms), [initialPrograms])
@@ -611,12 +621,12 @@ export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRo
     router.refresh()
   }
 
-  const grouped = LEVEL_ORDER.map(level => ({
-    level,
-    items: programs.filter(p =>
-      level === 'outros' ? !LEVEL_CONFIG[p.level ?? ''] : p.level === level,
-    ),
-  })).filter(g => g.items.length > 0)
+  const outros = programs.filter(p => !LEVEL_CONFIG[p.level ?? ''])
+  const openGroup = openLevel === 'outros'
+    ? { level: 'outros', items: outros }
+    : openLevel
+      ? { level: openLevel, items: programs.filter(p => p.level === openLevel) }
+      : null
 
   return (
     <div className="space-y-8">
@@ -636,35 +646,144 @@ export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRo
       {/* Formulário de novo programa */}
       {showForm && <NewProgramForm onCreated={handleCreated} />}
 
-      {/* Grupos por nível */}
+      {/* Cards de nível — estilo cards da página Empresas */}
       {programs.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 py-16 text-center">
           <p className="text-sm text-gray-400">Nenhum programa cadastrado.</p>
         </div>
       ) : (
-        grouped.map(group => {
-          const cfg = LEVEL_CONFIG[group.level]
-          return (
-            <section key={group.level}>
-              <h2 className={`mb-3 text-sm font-bold uppercase tracking-wide ${cfg?.headerClass ?? 'text-gray-500'}`}>
-                {cfg ? `${cfg.label} — ${cfg.deadline}` : 'Outros programas'}
-                <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
-                  {group.items.length}
+        <div className="flex flex-col gap-3">
+          {LEVEL_CARD_ORDER.map(level => {
+            const cfg = LEVEL_CONFIG[level]
+            const count = programs.filter(p => p.level === level).length
+            return (
+              <button
+                key={level}
+                onClick={() => setOpenLevel(level)}
+                className={`flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-l-4 bg-white px-5 py-4 text-left shadow-sm transition-shadow hover:shadow-md ${cfg.cardBorder} border-gray-200`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${cfg.dotClass}`} />
+                  <div>
+                    <p className={`font-semibold ${cfg.headerClass}`}>{cfg.label}</p>
+                    <p className="text-sm text-gray-500">{cfg.summary} — {cfg.deadline}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${cfg.badgeClass}`}>
+                    {count} programa{count !== 1 ? 's' : ''}
+                  </span>
+                  <span className="flex items-center gap-1 text-sm font-semibold text-blue-600">
+                    Ver programas
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                      <path d="M6 4l4 4-4 4" />
+                    </svg>
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+
+          {outros.length > 0 && (
+            <button
+              onClick={() => setOpenLevel('outros')}
+              className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-l-4 border-l-gray-300 border-gray-200 bg-white px-5 py-4 text-left shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gray-300" />
+                <div>
+                  <p className="font-semibold text-gray-700">Outros programas</p>
+                  <p className="text-sm text-gray-500">Sem nível de risco definido</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-500">
+                  {outros.length} programa{outros.length !== 1 ? 's' : ''}
                 </span>
-              </h2>
-              <ul className="space-y-3">
-                {group.items.map(p => (
-                  <ProgramCard
-                    key={p.id}
-                    program={p}
-                    onDeleted={id => setPrograms(ps => ps.filter(x => x.id !== id))}
-                  />
-                ))}
-              </ul>
-            </section>
-          )
-        })
+                <span className="flex items-center gap-1 text-sm font-semibold text-blue-600">
+                  Ver programas
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                    <path d="M6 4l4 4-4 4" />
+                  </svg>
+                </span>
+              </div>
+            </button>
+          )}
+        </div>
       )}
+
+      {openGroup && (
+        <LevelProgramsModal
+          level={openGroup.level}
+          programs={openGroup.items}
+          onClose={() => setOpenLevel(null)}
+          onDeleted={id => setPrograms(ps => ps.filter(x => x.id !== id))}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Popup por nível — lista os programas daquela criticidade ────────────────
+
+function LevelProgramsModal({
+  level,
+  programs,
+  onClose,
+  onDeleted,
+}: {
+  level: string
+  programs: ProgramRow[]
+  onClose: () => void
+  onDeleted: (id: string) => void
+}) {
+  const cfg = LEVEL_CONFIG[level]
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 p-5">
+          <div>
+            <p className={`text-xs font-bold uppercase tracking-wide ${cfg?.headerClass ?? 'text-gray-500'}`}>
+              {cfg ? `${cfg.label} — ${cfg.summary}` : 'Outros programas'}
+            </p>
+            <h3 className="mt-0.5 font-semibold text-gray-900">
+              {programs.length} programa{programs.length !== 1 ? 's' : ''}
+              {cfg ? ` · ${cfg.deadline}` : ''}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Fechar"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
+              <path d="M15 5 5 15M5 5l10 10" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          {programs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">Nenhum programa neste nível.</p>
+          ) : (
+            <ul className="space-y-3">
+              {programs.map(p => (
+                <ProgramCard key={p.id} program={p} onDeleted={onDeleted} />
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end border-t border-gray-100 p-4">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
