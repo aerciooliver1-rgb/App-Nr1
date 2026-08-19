@@ -11,7 +11,7 @@ import {
 } from '@/app/actions/settings'
 import type { SettingsFormState } from '@/app/actions/settings'
 import {
-  inviteUser,
+  createTeamUser,
   updateUserRole,
   revokeUser,
 } from '@/app/actions/users'
@@ -28,6 +28,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
   colaborador: 'Colaborador',
   visualizador: 'Visualizador',
+  superadmin: 'Superadmin',
 }
 
 function SaveButton({ label = 'Salvar' }: { label?: string }) {
@@ -265,7 +266,7 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
   const [mutError, setMutError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
-  const [inviteState, inviteAction] = useActionState<UserFormState, FormData>(inviteUser, undefined)
+  const [inviteState, inviteAction] = useActionState<UserFormState, FormData>(createTeamUser, undefined)
 
   function handleRoleChange(userId: string, role: UserRole) {
     const prev = users.find(u => u.id === userId)?.role
@@ -298,12 +299,14 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
 
   return (
     <div className="space-y-6">
-      {/* Convidar usuário */}
+      {/* Adicionar usuário */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Convidar Usuário</h3>
-        <p className="mb-4 text-xs text-gray-400">Um e-mail de convite será enviado com link de acesso.</p>
+        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Adicionar Usuário</h3>
+        <p className="mb-4 text-xs text-gray-400">
+          Defina a senha de acesso — a pessoa já poderá entrar com este e-mail e senha, sem precisar de convite por e-mail.
+        </p>
 
-        {inviteState?.success && <SuccessBanner message="Convite enviado com sucesso." />}
+        {inviteState?.success && <SuccessBanner message="Usuário criado com sucesso." />}
         {inviteState?.error && <ErrorBanner message={inviteState.error} />}
 
         <form action={inviteAction} className="space-y-4">
@@ -334,20 +337,36 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
               )}
             </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Nível de acesso *</label>
-            <select
-              name="role"
-              defaultValue="colaborador"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-            >
-              <option value="colaborador">Colaborador — acesso padrão</option>
-              <option value="visualizador">Visualizador — somente leitura</option>
-              <option value="admin">Admin — acesso total</option>
-            </select>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Senha de acesso *</label>
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                placeholder="Mínimo 8 caracteres"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              />
+              {inviteState?.errors?.password && (
+                <p className="mt-0.5 text-xs text-red-600">{inviteState.errors.password[0]}</p>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Nível de acesso *</label>
+              <select
+                name="role"
+                defaultValue="colaborador"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              >
+                <option value="colaborador">Colaborador — acesso padrão</option>
+                <option value="visualizador">Visualizador — somente leitura</option>
+                <option value="admin">Admin — acesso total</option>
+              </select>
+            </div>
           </div>
           <div className="flex justify-end">
-            <SaveButton label="Enviar convite" />
+            <SaveButton label="Criar usuário" />
           </div>
         </form>
       </div>
@@ -375,15 +394,21 @@ function UsuariosTab({ initialUsers }: { initialUsers: ManagedUser[] }) {
                   <span className="truncate text-sm font-medium text-gray-900">{u.full_name}</span>
                   <span className="truncate text-xs text-gray-400">{u.email}</span>
                 </div>
-                <select
-                  value={u.role}
-                  onChange={e => handleRoleChange(u.id, e.target.value as UserRole)}
-                  className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 focus:border-blue-400 focus:outline-none"
-                >
-                  {(Object.keys(ROLE_LABELS) as UserRole[]).map(r => (
-                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                  ))}
-                </select>
+                {u.role === 'superadmin' ? (
+                  <span className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-500">
+                    {ROLE_LABELS.superadmin}
+                  </span>
+                ) : (
+                  <select
+                    value={u.role}
+                    onChange={e => handleRoleChange(u.id, e.target.value as UserRole)}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 focus:border-blue-400 focus:outline-none"
+                  >
+                    {(['admin', 'colaborador', 'visualizador'] as const).map(r => (
+                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                    ))}
+                  </select>
+                )}
                 <button
                   onClick={() => handleRevoke(u.id, u.full_name)}
                   className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"

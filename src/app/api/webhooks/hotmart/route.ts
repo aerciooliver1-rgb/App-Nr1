@@ -99,6 +99,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, warning: 'usuário não encontrado — registrado para ativação manual' })
   }
 
+  // O plano é da conta (tenant) inteira, compartilhado pela equipe — não só de quem comprou
+  const { data: profile } = await supabase.from('profiles').select('account_id').eq('id', user.id).single()
+  const accountId = profile?.account_id
+  if (!accountId) {
+    await audit(supabase, 'hotmart_sem_conta', { event, email, offerCode, transaction })
+    return NextResponse.json({ received: true, warning: 'usuário sem conta associada — registrado para ativação manual' })
+  }
+
   if (ACTIVATE_EVENTS.has(event)) {
     const plan = planFromOfferCode(offerCode)
     if (!plan) {
@@ -109,7 +117,7 @@ export async function POST(request: Request) {
     const fields = subscriptionFieldsFor(plan)
     const { error } = await supabase
       .from('subscriptions')
-      .upsert({ user_id: user.id, ...fields }, { onConflict: 'user_id' })
+      .upsert({ user_id: user.id, account_id: accountId, ...fields }, { onConflict: 'account_id' })
 
     if (error) {
       await audit(supabase, 'hotmart_erro_ativacao', { event, email, plan, transaction, error: error.message })
@@ -123,7 +131,7 @@ export async function POST(request: Request) {
   // Cancelamento / reembolso / chargeback → volta ao trial
   const { error } = await supabase
     .from('subscriptions')
-    .upsert({ user_id: user.id, ...trialFields() }, { onConflict: 'user_id' })
+    .upsert({ user_id: user.id, account_id: accountId, ...trialFields() }, { onConflict: 'account_id' })
 
   if (error) {
     await audit(supabase, 'hotmart_erro_cancelamento', { event, email, transaction, error: error.message })

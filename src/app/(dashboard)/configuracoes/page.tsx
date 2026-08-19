@@ -10,12 +10,22 @@ async function getData() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [{ data: profile }, { data: companies }, users, { data: subscription }, { data: responsesThisMonth }] = await Promise.all([
-    supabase.from('profiles').select('role, full_name, registro_profissional').eq('id', user.id).single(),
-    supabase.from('companies').select('id, name, logo_url').eq('created_by', user.id).order('name'),
+  const { data: profile } = await supabase
+    .from('profiles').select('role, full_name, registro_profissional, account_id').eq('id', user.id).single()
+
+  const accountId = profile?.account_id ?? null
+
+  const [{ data: companies }, users, { data: subscription }, { data: responsesThisMonth }] = await Promise.all([
+    accountId
+      ? supabase.from('companies').select('id, name, logo_url').eq('account_id', accountId).order('name')
+      : Promise.resolve({ data: [] }),
     listUsers(),
-    supabase.from('subscriptions').select('*').eq('user_id', user.id).maybeSingle(),
-    supabase.rpc('count_monthly_responses', { p_user_id: user.id }),
+    accountId
+      ? supabase.from('subscriptions').select('*').eq('account_id', accountId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    accountId
+      ? supabase.rpc('count_monthly_responses_account', { p_account_id: accountId })
+      : Promise.resolve({ data: 0 }),
   ])
 
   const userName: string =
@@ -28,7 +38,7 @@ async function getData() {
     user: { id: user.id, email: user.email ?? '', name: userName },
     userRegistry: profile?.registro_profissional ?? '',
     companies: companies ?? [],
-    isAdmin: profile?.role === 'admin',
+    isAdmin: profile?.role === 'admin' || profile?.role === 'superadmin',
     users,
     subscription: subscription ?? null,
     responsesThisMonth: responsesThisMonth ?? 0,

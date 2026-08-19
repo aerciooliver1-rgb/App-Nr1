@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAccountContext } from '@/lib/supabase/server'
 import { validateCNPJ } from '@/lib/utils'
 
 const companySchema = z.object({
@@ -28,15 +28,15 @@ export type CompanyState = {
 
 export async function createCompany(state: CompanyState, formData: FormData): Promise<CompanyState> {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { message: 'Não autorizado.' }
+  const ctx = await getAccountContext()
+  if (!ctx || !ctx.accountId) return { message: 'Não autorizado.' }
 
   const validated = companySchema.safeParse(Object.fromEntries(formData))
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
 
   const { data, error } = await supabase
     .from('companies')
-    .insert({ ...validated.data, created_by: user.id })
+    .insert({ ...validated.data, created_by: ctx.userId, account_id: ctx.accountId })
     .select('id')
     .single()
 
@@ -100,7 +100,8 @@ export async function deleteCompany(id: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase.from('companies').delete().eq('id', id).eq('created_by', user.id)
+  // RLS restringe a exclusão a admin/superadmin da própria conta.
+  await supabase.from('companies').delete().eq('id', id)
 
   revalidatePath('/empresas')
   redirect('/empresas')
@@ -111,7 +112,8 @@ export async function deleteSector(id: string, companyId: string): Promise<void>
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase.from('sectors').delete().eq('id', id).eq('created_by', user.id)
+  // RLS restringe a exclusão a admin/superadmin da própria conta.
+  await supabase.from('sectors').delete().eq('id', id)
 
   revalidatePath(`/empresas/${companyId}`)
   redirect(`/empresas/${companyId}`)

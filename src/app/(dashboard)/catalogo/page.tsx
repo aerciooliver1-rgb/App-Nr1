@@ -12,7 +12,7 @@ export default async function CatalogoPage() {
   const { data: profile } = await supabase
     .from('profiles').select('role').eq('id', user.id).single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'superadmin') {
     return (
       <>
         <Header title="Catálogo de Programas" />
@@ -20,7 +20,7 @@ export default async function CatalogoPage() {
           <div className="text-center">
             <p className="text-sm font-medium text-gray-700">Acesso restrito</p>
             <p className="mt-1 text-xs text-gray-400">
-              Apenas administradores podem gerenciar o catálogo de programas.
+              Apenas a administração da plataforma pode gerenciar o catálogo de programas.
             </p>
           </div>
         </div>

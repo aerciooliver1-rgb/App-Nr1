@@ -106,7 +106,7 @@ async function requireAdmin() {
   if (!user) return { supabase, error: 'Não autorizado.' }
   const { data: profile } = await supabase
     .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return { supabase, error: 'Apenas administradores podem gerenciar programas padrão.' }
+  if (profile?.role !== 'superadmin') return { supabase, error: 'Apenas a administração da plataforma pode gerenciar o catálogo padrão.' }
   return { supabase, user }
 }
 

@@ -33,9 +33,13 @@ const modeASchema = z.object({
 // Trava mensal por plano: cota + até 20% de extras (R$ 2,00 cada).
 // Atingida a trava, novas avaliações bloqueiam até o reinício do ciclo de 30 dias.
 async function checkResponseCapacity(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
+  const { data: profile } = await supabase.from('profiles').select('account_id').eq('id', userId).single()
+  const accountId = profile?.account_id
+  if (!accountId) return null
+
   const [{ data: used }, { data: sub }] = await Promise.all([
-    supabase.rpc('count_monthly_responses', { p_user_id: userId }),
-    supabase.from('subscriptions').select('responses_monthly_limit').eq('user_id', userId).maybeSingle(),
+    supabase.rpc('count_monthly_responses_account', { p_account_id: accountId }),
+    supabase.from('subscriptions').select('responses_monthly_limit').eq('account_id', accountId).maybeSingle(),
   ])
   const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
   const cap = monthlyCapFor(quota)
@@ -262,20 +266,25 @@ export async function submitAnonymousAnswers(
   if (tokenRow.status !== 'ativo') return { error: 'Este link foi encerrado.' }
   if (new Date(tokenRow.expires_at) < new Date()) return { error: 'Este link expirou.' }
 
-  // Trava mensal do plano do dono da avaliação (cota + extras de 20%)
+  // Trava mensal do plano da conta dona da avaliação (cota + extras de 20%)
   const { data: owner } = await supabase
     .from('assessments')
     .select('created_by')
     .eq('id', tokenRow.assessment_id)
     .single()
   if (owner?.created_by) {
-    const [{ data: used }, { data: sub }] = await Promise.all([
-      supabase.rpc('count_monthly_responses', { p_user_id: owner.created_by }),
-      supabase.from('subscriptions').select('responses_monthly_limit').eq('user_id', owner.created_by).maybeSingle(),
-    ])
-    const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
-    if ((used ?? 0) >= monthlyCapFor(quota)) {
-      return { error: 'A coleta deste mês atingiu o limite do plano. Novas respostas serão aceitas no reinício do ciclo de 30 dias.' }
+    const { data: creatorProfile } = await supabase
+      .from('profiles').select('account_id').eq('id', owner.created_by).single()
+    const accountId = creatorProfile?.account_id
+    if (accountId) {
+      const [{ data: used }, { data: sub }] = await Promise.all([
+        supabase.rpc('count_monthly_responses_account', { p_account_id: accountId }),
+        supabase.from('subscriptions').select('responses_monthly_limit').eq('account_id', accountId).maybeSingle(),
+      ])
+      const quota = sub?.responses_monthly_limit ?? PLAN_RESPONSE_LIMITS.trial
+      if ((used ?? 0) >= monthlyCapFor(quota)) {
+        return { error: 'A coleta deste mês atingiu o limite do plano. Novas respostas serão aceitas no reinício do ciclo de 30 dias.' }
+      }
     }
   }
 

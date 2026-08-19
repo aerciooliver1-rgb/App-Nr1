@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient, getAccountContext } from '@/lib/supabase/server'
 
 export interface LGPDExport {
   profile: {
@@ -40,13 +40,24 @@ export interface LGPDExport {
 }
 
 async function assertAdmin() {
+  const ctx = await getAccountContext()
+  if (!ctx) return { error: 'Não autorizado.', ctx: null }
+  if (ctx.role !== 'admin' && !ctx.isSuperadmin) {
+    return { error: 'Apenas administradores podem realizar operações LGPD.', ctx: null }
+  }
+  return { error: null, ctx }
+}
+
+/** Tenant admin só pode operar sobre gente da própria conta — superadmin vê todas. */
+async function assertTargetInAccount(
+  ctx: NonNullable<Awaited<ReturnType<typeof assertAdmin>>['ctx']>,
+  targetUserId: string,
+): Promise<string | null> {
+  if (ctx.isSuperadmin) return null
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.', user: null, supabase: null }
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') return { error: 'Apenas administradores podem realizar operações LGPD.', user: null, supabase: null }
-  return { error: null, user, supabase }
+  const { data: target } = await supabase.from('profiles').select('account_id').eq('id', targetUserId).single()
+  if (!target || target.account_id !== ctx.accountId) return 'Usuário não pertence à sua conta.'
+  return null
 }
 
 // ─── Exportar dados do usuário ────────────────────────────────────────────────
@@ -54,8 +65,10 @@ async function assertAdmin() {
 export async function exportUserData(
   targetUserId: string,
 ): Promise<{ data?: LGPDExport; error?: string }> {
-  const { error: authError } = await assertAdmin()
-  if (authError) return { error: authError }
+  const { error: authError, ctx } = await assertAdmin()
+  if (authError || !ctx) return { error: authError ?? 'Não autorizado.' }
+  const scopeError = await assertTargetInAccount(ctx, targetUserId)
+  if (scopeError) return { error: scopeError }
 
   const supabase = await createClient()
   const serviceClient = await createServiceClient()
@@ -125,10 +138,10 @@ export async function exportUserData(
   }
 
   const adminSupabase = await createClient()
-  const { data: { user: admin } } = await adminSupabase.auth.getUser()
   await adminSupabase.from('audit_logs').insert({
     action: 'LGPD_EXPORT',
-    user_id: admin?.id ?? null,
+    user_id: ctx.userId,
+    account_id: ctx.accountId,
     table_name: 'profiles',
     record_id: targetUserId,
   })
@@ -146,19 +159,21 @@ export async function permanentDeleteUser(
     return { error: 'Confirmação inválida. Digite exatamente EXCLUIR para confirmar.' }
   }
 
-  const { error: authError } = await assertAdmin()
-  if (authError) return { error: authError }
+  const { error: authError, ctx } = await assertAdmin()
+  if (authError || !ctx) return { error: authError ?? 'Não autorizado.' }
+  if (ctx.userId === targetUserId) return { error: 'Não é possível excluir o próprio usuário.' }
+  const scopeError = await assertTargetInAccount(ctx, targetUserId)
+  if (scopeError) return { error: scopeError }
 
   const supabase = await createClient()
-  const { data: { user: admin } } = await supabase.auth.getUser()
-  if (admin?.id === targetUserId) return { error: 'Não é possível excluir o próprio usuário.' }
 
   const { data: targetProfile } = await supabase
     .from('profiles').select('full_name').eq('id', targetUserId).single()
 
   await supabase.from('audit_logs').insert({
     action: 'LGPD_DELETE',
-    user_id: admin?.id ?? null,
+    user_id: ctx.userId,
+    account_id: ctx.accountId,
     table_name: 'profiles',
     record_id: targetUserId,
   })

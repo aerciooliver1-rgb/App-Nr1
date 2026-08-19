@@ -12,7 +12,7 @@ export default async function PrivacidadePage() {
   const { data: profile } = await supabase
     .from('profiles').select('role').eq('id', user.id).single()
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'admin' && profile?.role !== 'superadmin') {
     return (
       <>
         <Header title="Privacidade e LGPD" />

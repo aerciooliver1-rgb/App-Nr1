@@ -59,6 +59,10 @@ async function getDashboardData() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
+  const accountId = user
+    ? (await supabase.from('profiles').select('account_id').eq('id', user.id).single()).data?.account_id ?? null
+    : null
+
   const now = new Date()
   const in24h = new Date(now.getTime() + 86_400_000)
 
@@ -120,13 +124,13 @@ async function getDashboardData() {
     supabase.from('risk_scores').select('level'),
 
     // Subscription data
-    user
-      ? supabase.from('subscriptions').select('*').eq('user_id', user.id).maybeSingle()
+    accountId
+      ? supabase.from('subscriptions').select('*').eq('account_id', accountId).maybeSingle()
       : Promise.resolve({ data: null }),
 
     // Avaliações respondidas no mês (unidade de cobrança do plano)
-    user
-      ? supabase.rpc('count_monthly_responses', { p_user_id: user.id })
+    accountId
+      ? supabase.rpc('count_monthly_responses_account', { p_account_id: accountId })
       : Promise.resolve({ data: 0 }),
 
     // Ciclos calculados — checados abaixo contra quais já têm plano de ação

@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          created_at: string | null
+          id: string
+          owner_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          owner_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          owner_id?: string | null
+        }
+        Relationships: []
+      }
       action_plans: {
         Row: {
           assessment_id: string
@@ -290,6 +308,7 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          account_id: string | null
           action: string
           created_at: string | null
           id: string
@@ -299,6 +318,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          account_id?: string | null
           action: string
           created_at?: string | null
           id?: string
@@ -308,6 +328,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          account_id?: string | null
           action?: string
           created_at?: string | null
           id?: string
@@ -317,6 +338,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "audit_logs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "audit_logs_user_id_fkey"
             columns: ["user_id"]
@@ -328,6 +356,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          account_id: string
           cnpj: string
           contact_email: string | null
           contact_name: string | null
@@ -341,6 +370,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          account_id: string
           cnpj: string
           contact_email?: string | null
           contact_name?: string | null
@@ -354,6 +384,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          account_id?: string
           cnpj?: string
           contact_email?: string | null
           contact_name?: string | null
@@ -367,6 +398,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "companies_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "companies_created_by_fkey"
             columns: ["created_by"]
@@ -417,6 +455,44 @@ export type Database = {
             columns: ["uploaded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      impersonation_sessions: {
+        Row: {
+          ended_at: string | null
+          id: string
+          started_at: string
+          superadmin_id: string
+          target_account_id: string
+          target_user_id: string
+          token: string
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          superadmin_id: string
+          target_account_id: string
+          target_user_id: string
+          token?: string
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          started_at?: string
+          superadmin_id?: string
+          target_account_id?: string
+          target_user_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_sessions_target_account_id_fkey"
+            columns: ["target_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -514,6 +590,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_id: string | null
           created_at: string | null
           full_name: string
           id: string
@@ -522,6 +599,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          account_id?: string | null
           created_at?: string | null
           full_name: string
           id: string
@@ -530,6 +608,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          account_id?: string | null
           created_at?: string | null
           full_name?: string
           id?: string
@@ -537,97 +616,115 @@ export type Database = {
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       programs: {
         Row: {
+          account_id: string | null
           active: boolean
           code: string | null
-          indicators: string | null
-          materials: string | null
-          methodology: string | null
-          objectives: string | null
-          partner_profile: string | null
-          reference_norms: string | null
-          structure: string | null
-          score_range: string | null
-          deliverable_title: string | null
-          deliverable_content_label: string | null
-          deliverable_content_fields: string | null
           created_at: string | null
           created_by: string | null
+          deliverable_content_fields: string | null
+          deliverable_content_label: string | null
+          deliverable_title: string | null
           description: string | null
           factor_ids: string | null
           id: string
+          indicators: string | null
           level: string | null
+          materials: string | null
+          methodology: string | null
           modality: string | null
           name: string
+          objectives: string | null
+          partner_profile: string | null
+          reference_norms: string | null
+          score_range: string | null
           sessions: string | null
           start_deadline: string | null
+          structure: string | null
           target_audience: string | null
           type: Database["public"]["Enums"]["program_type"]
           updated_at: string | null
           workload: string | null
         }
         Insert: {
+          account_id?: string | null
           active?: boolean
+          code?: string | null
           created_at?: string | null
           created_by?: string | null
+          deliverable_content_fields?: string | null
+          deliverable_content_label?: string | null
+          deliverable_title?: string | null
           description?: string | null
-          code?: string | null
+          factor_ids?: string | null
+          id?: string
           indicators?: string | null
+          level?: string | null
           materials?: string | null
           methodology?: string | null
+          modality?: string | null
+          name: string
           objectives?: string | null
           partner_profile?: string | null
           reference_norms?: string | null
-          structure?: string | null
           score_range?: string | null
-          deliverable_title?: string | null
-          deliverable_content_label?: string | null
-          deliverable_content_fields?: string | null
-          factor_ids?: string | null
-          level?: string | null
-          modality?: string | null
           sessions?: string | null
           start_deadline?: string | null
+          structure?: string | null
           target_audience?: string | null
-          workload?: string | null
-          id?: string
-          name: string
           type?: Database["public"]["Enums"]["program_type"]
           updated_at?: string | null
+          workload?: string | null
         }
         Update: {
+          account_id?: string | null
           active?: boolean
+          code?: string | null
           created_at?: string | null
           created_by?: string | null
+          deliverable_content_fields?: string | null
+          deliverable_content_label?: string | null
+          deliverable_title?: string | null
           description?: string | null
-          code?: string | null
+          factor_ids?: string | null
+          id?: string
           indicators?: string | null
+          level?: string | null
           materials?: string | null
           methodology?: string | null
+          modality?: string | null
+          name?: string
           objectives?: string | null
           partner_profile?: string | null
           reference_norms?: string | null
-          structure?: string | null
           score_range?: string | null
-          deliverable_title?: string | null
-          deliverable_content_label?: string | null
-          deliverable_content_fields?: string | null
-          factor_ids?: string | null
-          level?: string | null
-          modality?: string | null
           sessions?: string | null
           start_deadline?: string | null
+          structure?: string | null
           target_audience?: string | null
-          workload?: string | null
-          id?: string
-          name?: string
           type?: Database["public"]["Enums"]["program_type"]
           updated_at?: string | null
+          workload?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "programs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "programs_created_by_fkey"
             columns: ["created_by"]
@@ -636,6 +733,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      question_meta: {
+        Row: {
+          factor_id: string
+          inversao: boolean
+          question_id: string
+        }
+        Insert: {
+          factor_id: string
+          inversao: boolean
+          question_id: string
+        }
+        Update: {
+          factor_id?: string
+          inversao?: boolean
+          question_id?: string
+        }
+        Relationships: []
       }
       risk_scores: {
         Row: {
@@ -722,6 +837,7 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          account_id: string
           assessments_monthly_limit: number
           created_at: string
           id: string
@@ -733,6 +849,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id: string
           assessments_monthly_limit?: number
           created_at?: string
           id?: string
@@ -744,6 +861,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string
           assessments_monthly_limit?: number
           created_at?: string
           id?: string
@@ -755,6 +873,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subscriptions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subscriptions_user_id_fkey"
             columns: ["user_id"]
@@ -769,11 +894,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      action_account_id: { Args: { p_action_id: string }; Returns: string }
+      assessment_account_id: {
+        Args: { p_assessment_id: string }
+        Returns: string
+      }
+      calculate_risk_scores_sql: {
+        Args: { p_assessment_id: string }
+        Returns: undefined
+      }
+      count_monthly_responses_account: {
+        Args: { p_account_id: string }
+        Returns: number
+      }
       expire_assessment_tokens: { Args: never; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
-      calculate_risk_scores_sql: { Args: { p_assessment_id: string }; Returns: undefined }
-      count_monthly_responses: { Args: { p_user_id: string }; Returns: number }
+      is_superadmin: { Args: never; Returns: boolean }
       mark_overdue_actions: { Args: never; Returns: undefined }
+      my_account_id: { Args: never; Returns: string }
+      my_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      plan_account_id: { Args: { p_plan_id: string }; Returns: string }
+      sector_account_id: { Args: { p_sector_id: string }; Returns: string }
     }
     Enums: {
       action_status: "pendente" | "em_andamento" | "concluida" | "atrasada"
@@ -784,7 +928,7 @@ export type Database = {
       program_type: "padrao" | "personalizado"
       risk_level: "baixo" | "moderado" | "alto" | "critico"
       token_status: "ativo" | "expirado" | "encerrado"
-      user_role: "admin" | "colaborador" | "visualizador"
+      user_role: "admin" | "colaborador" | "visualizador" | "superadmin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -817,13 +961,13 @@ export type Tables<
     : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
         DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-      DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-    ? R
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
     : never
-  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
@@ -843,12 +987,12 @@ export type TablesInsert<
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-      Insert: infer I
-    }
-    ? I
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
     : never
-  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
@@ -868,12 +1012,12 @@ export type TablesUpdate<
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-      Update: infer U
-    }
-    ? U
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
     : never
-  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
@@ -889,8 +1033,8 @@ export type Enums<
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
@@ -906,8 +1050,8 @@ export type CompositeTypes<
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 // ─── Alias de tipos derivados dos Enums ──────────────────────────────────────
 
@@ -932,7 +1076,7 @@ export const Constants = {
       program_type: ["padrao", "personalizado"],
       risk_level: ["baixo", "moderado", "alto", "critico"],
       token_status: ["ativo", "expirado", "encerrado"],
-      user_role: ["admin", "colaborador", "visualizador"],
+      user_role: ["admin", "colaborador", "visualizador", "superadmin"],
     },
   },
 } as const

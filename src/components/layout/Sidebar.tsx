@@ -14,6 +14,10 @@ const nav = [
   { href: '/configuracoes', label: 'Configurações',icon: 'settings' },
 ]
 
+const superadminNav = [
+  { href: '/contas', label: 'Contas', icon: 'accounts' },
+]
+
 function NavIcon({ name }: { name: string }) {
   const props = {
     viewBox: '0 0 20 20',
@@ -65,6 +69,14 @@ function NavIcon({ name }: { name: string }) {
       <path d="M10 2v2.5M10 15.5V18M2 10h2.5M15.5 10H18M4.22 4.22l1.76 1.76M14.02 14.02l1.76 1.76M15.78 4.22l-1.76 1.76M5.98 14.02l-1.76 1.76" />
     </svg>
   )
+  if (name === 'accounts') return (
+    <svg {...props}>
+      <circle cx="7" cy="6" r="2.5" />
+      <circle cx="14" cy="6" r="2.5" />
+      <path d="M2.5 17v-1a4.5 4.5 0 019 0v1" />
+      <path d="M11 12.5a4.5 4.5 0 016.5 4v.5" />
+    </svg>
+  )
   if (name === 'logout') return (
     <svg {...props}>
       <path d="M12 10H3M3 10l3-3M3 10l3 3" />
@@ -74,8 +86,9 @@ function NavIcon({ name }: { name: string }) {
   return null
 }
 
-export function Sidebar() {
+export function Sidebar({ isSuperadmin = false }: { isSuperadmin?: boolean }) {
   const pathname = usePathname()
+  const items = isSuperadmin ? [...nav, ...superadminNav] : nav
 
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col bg-slate-900">
@@ -98,7 +111,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex flex-1 flex-col gap-0.5 px-2 py-3">
-        {nav.map(({ href, label, icon }) => {
+        {items.map(({ href, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
