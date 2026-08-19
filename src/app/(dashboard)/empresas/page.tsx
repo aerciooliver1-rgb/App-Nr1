@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Header } from '@/components/layout/Header'
 import { Button } from '@/components/ui/Button'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAccountContext } from '@/lib/supabase/server'
 import { EmpresasSearch } from './EmpresasSearch'
 import type { RiskLevel } from '@/types'
 
@@ -35,7 +35,8 @@ function getCompanyRisk(company: Awaited<ReturnType<typeof getCompanies>>[0]): R
 }
 
 export default async function CompaniesPage() {
-  const companies = await getCompanies()
+  const [companies, ctx] = await Promise.all([getCompanies(), getAccountContext()])
+  const canWrite = ctx?.isSuperadmin || ctx?.role === 'admin' || ctx?.role === 'colaborador'
 
   const rows = companies.map(c => ({
     id: c.id,
@@ -54,17 +55,21 @@ export default async function CompaniesPage() {
           <p className="text-sm text-gray-400">
             {companies.length} empresa{companies.length !== 1 ? 's' : ''} cadastrada{companies.length !== 1 ? 's' : ''}
           </p>
-          <Link href="/empresas/nova">
-            <Button>+ Nova Empresa</Button>
-          </Link>
+          {canWrite && (
+            <Link href="/empresas/nova">
+              <Button>+ Nova Empresa</Button>
+            </Link>
+          )}
         </div>
 
         {companies.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center">
             <p className="text-gray-400">Nenhuma empresa cadastrada.</p>
-            <Link href="/empresas/nova">
-              <Button className="mt-4">Cadastrar primeira empresa</Button>
-            </Link>
+            {canWrite && (
+              <Link href="/empresas/nova">
+                <Button className="mt-4">Cadastrar primeira empresa</Button>
+              </Link>
+            )}
           </div>
         ) : (
           <EmpresasSearch companies={rows} />
