@@ -437,47 +437,6 @@ const PLAN_CONFIG: Record<string, {
   anual:     { label: 'Enterprise', color: 'border-t-emerald-500', chip: 'bg-emerald-100 text-emerald-700' },
 }
 
-const HOTMART_CHECKOUT: Record<string, string | undefined> = {
-  mensal: process.env.NEXT_PUBLIC_HOTMART_CHECKOUT_MENSAL,
-  semestral: process.env.NEXT_PUBLIC_HOTMART_CHECKOUT_SEMESTRAL,
-  anual: process.env.NEXT_PUBLIC_HOTMART_CHECKOUT_ANUAL,
-}
-
-const PLANS = [
-  {
-    id: 'mensal',
-    name: 'Start',
-    price: 'R$600',
-    period: '/mês',
-    limit: '300 avaliações/mês',
-    perUnit: 'R$ 2,00 por avaliação · extras até 60/mês',
-    highlight: false,
-    description: 'Ideal para profissionais em início de carteira de clientes.',
-  },
-  {
-    id: 'semestral',
-    name: 'Pro',
-    price: 'R$500',
-    period: '/mês',
-    total: 'R$3.000 cobrado a cada 6 meses',
-    limit: '3.000 no semestre',
-    perUnit: 'Cota de 500/mês · R$ 1,00 por avaliação · extras até 100/mês',
-    highlight: true,
-    description: 'Melhor custo-benefício para consultores ativos.',
-  },
-  {
-    id: 'anual',
-    name: 'Enterprise',
-    price: 'R$450',
-    period: '/mês',
-    total: 'R$5.400 cobrado anualmente',
-    limit: '12.000 no ano',
-    perUnit: 'Cota de 1.000/mês · R$ 0,45 por avaliação · extras até 200/mês',
-    highlight: false,
-    description: 'Para psicólogos e equipes com alto volume de diagnósticos.',
-  },
-]
-
 function PlanoTab({
   subscription,
   responsesThisMonth,
@@ -583,81 +542,6 @@ function PlanoTab({
             )}
           </div>
         </div>
-      </div>
-
-      {/* Tabela de planos */}
-      <div>
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Planos disponíveis
-        </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {PLANS.map(plan => (
-            <div
-              key={plan.id}
-              className={`relative rounded-xl border bg-white p-5 shadow-sm ${
-                plan.highlight
-                  ? 'border-violet-400 ring-2 ring-violet-200'
-                  : 'border-gray-200'
-              }`}
-            >
-              {plan.highlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="rounded-full bg-violet-600 px-3 py-0.5 text-xs font-bold text-white shadow-sm">
-                    Mais popular
-                  </span>
-                </div>
-              )}
-              <p className="text-sm font-bold text-gray-900">{plan.name}</p>
-              <div className="mt-1 flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-gray-900">{plan.price}</span>
-                <span className="text-xs text-gray-400">{plan.period}</span>
-              </div>
-              {plan.total && (
-                <p className="mt-0.5 text-[11px] text-gray-400">{plan.total}</p>
-              )}
-              <div className="mt-3 space-y-1.5 border-t border-gray-100 pt-3">
-                <p className="text-xs text-gray-700">
-                  <span className="font-semibold">{plan.limit}</span>
-                </p>
-                <p className="text-xs text-gray-400">{plan.perUnit}</p>
-                <p className="text-xs text-gray-400">{plan.description}</p>
-              </div>
-              {planType === plan.id ? (
-                <div className="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-center text-xs font-semibold text-gray-400">
-                  Plano atual
-                </div>
-              ) : HOTMART_CHECKOUT[plan.id] ? (
-                <a
-                  href={HOTMART_CHECKOUT[plan.id]}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`mt-4 block rounded-lg px-3 py-2 text-center text-xs font-semibold transition-colors ${
-                    plan.highlight
-                      ? 'bg-violet-600 text-white hover:bg-violet-700'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
-                  Assinar agora →
-                </a>
-              ) : (
-                <a
-                  href={`mailto:aerciooliver1@gmail.com?subject=Upgrade%20para%20plano%20${plan.name}&body=Olá,%20gostaria%20de%20fazer%20upgrade%20para%20o%20plano%20${plan.name}.`}
-                  className={`mt-4 block rounded-lg px-3 py-2 text-center text-xs font-semibold transition-colors ${
-                    plan.highlight
-                      ? 'bg-violet-600 text-white hover:bg-violet-700'
-                      : 'border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-600'
-                  }`}
-                >
-                  Solicitar upgrade →
-                </a>
-              )}
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-center text-[11px] text-gray-400">
-          Planos sem fidelidade. Pagamento seguro via Hotmart (cartão, PIX ou boleto) — ativação automática após a confirmação. Compre com o mesmo e-mail usado no login.
-          Extras de R$ 2,00 por avaliação, limitados a 20% da cota; a contagem reinicia a cada 30 dias, contados da ativação do plano.
-        </p>
       </div>
     </div>
   )
