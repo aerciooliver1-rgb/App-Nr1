@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import {
   updateProfile,
   updatePassword,
+  registerCompany,
   updateCompany,
   uploadCompanyLogo,
 } from '@/app/actions/settings'
@@ -156,21 +157,123 @@ function PerfilTab({ userName, userEmail, userRegistry }: { userName: string; us
 
 const COMPANY_SIZES = ['Microempresa', 'Pequeno porte', 'Médio porte', 'Grande porte']
 
+function CompanyFields({
+  defaults,
+  errors,
+}: {
+  defaults?: Partial<CompanyOption>
+  errors?: Record<string, string[]>
+}) {
+  return (
+    <>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-700">Razão social *</label>
+        <input
+          name="name"
+          defaultValue={defaults?.name ?? ''}
+          required
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+        />
+        {errors?.name && <p className="mt-0.5 text-xs text-red-600">{errors.name[0]}</p>}
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-700">CNPJ *</label>
+        <input
+          name="cnpj"
+          defaultValue={defaults?.cnpj ?? ''}
+          placeholder="00.000.000/0000-00"
+          required
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+        />
+        {errors?.cnpj && <p className="mt-0.5 text-xs text-red-600">{errors.cnpj[0]}</p>}
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-700">Porte</label>
+        <select
+          name="size"
+          defaultValue={defaults?.size ?? ''}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+        >
+          <option value="">Selecione</option>
+          {COMPANY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-gray-700">Setor econômico</label>
+        <input
+          name="economic_sector"
+          defaultValue={defaults?.economic_sector ?? ''}
+          placeholder="Ex: Saúde, Tecnologia, Indústria"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">Nome do contato</label>
+          <input
+            name="contact_name"
+            defaultValue={defaults?.contact_name ?? ''}
+            placeholder="Responsável pelo contato"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-700">E-mail do contato</label>
+          <input
+            name="contact_email"
+            type="email"
+            defaultValue={defaults?.contact_email ?? ''}
+            placeholder="contato@empresa.com.br"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+          />
+          {errors?.contact_email && <p className="mt-0.5 text-xs text-red-600">{errors.contact_email[0]}</p>}
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-400">
+        Estes são os dados cadastrais da empresa. A pessoa responsável por realizar a
+        avaliação continua sendo o Perfil de Usuário com login próprio (aba Usuários) —
+        cadastrar o CNPJ aqui não substitui a necessidade de um usuário.
+      </p>
+    </>
+  )
+}
+
 function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
+  const router = useRouter()
   const [selectedId, setSelectedId] = useState(companies[0]?.id ?? '')
   const selectedCompany = companies.find(c => c.id === selectedId)
 
+  const [registerState, registerAction] = useActionState<SettingsFormState, FormData>(registerCompany, undefined)
   const [companyState, companyAction] = useActionState<SettingsFormState, FormData>(updateCompany, undefined)
   const [logoState, logoAction] = useActionState<SettingsFormState, FormData>(uploadCompanyLogo, undefined)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!companies.some(c => c.id === selectedId)) setSelectedId(companies[0]?.id ?? '')
+  }, [companies, selectedId])
+
+  useEffect(() => {
+    if (registerState?.success) router.refresh()
+  }, [registerState?.success, router])
+
   if (companies.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 py-12 text-center">
-        <p className="text-sm text-gray-400">Nenhuma empresa encontrada.</p>
-        <a href="/empresas/nova" className="mt-3 inline-block text-sm font-medium text-blue-600 hover:underline">
-          Cadastrar empresa →
-        </a>
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Cadastrar Empresa</h3>
+        <p className="mb-4 text-xs text-gray-400">
+          Nenhuma empresa cadastrada nesta conta ainda. Preencha os dados abaixo para começar
+          (o upload de logo fica disponível assim que a empresa for salva).
+        </p>
+
+        {registerState?.success && <SuccessBanner message="Empresa cadastrada com sucesso." />}
+        {registerState?.error && <ErrorBanner message={registerState.error} />}
+
+        <form action={registerAction} className="mt-3 space-y-4">
+          <CompanyFields errors={registerState?.errors} />
+          <div className="flex justify-end">
+            <SaveButton label="Cadastrar empresa" />
+          </div>
+        </form>
       </div>
     )
   }
@@ -200,80 +303,7 @@ function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
 
         <form action={companyAction} key={selectedId} className="mt-3 space-y-4">
           <input type="hidden" name="company_id" value={selectedId} />
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Razão social *</label>
-            <input
-              name="name"
-              defaultValue={selectedCompany?.name ?? ''}
-              required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-            />
-            {companyState?.errors?.name && (
-              <p className="mt-0.5 text-xs text-red-600">{companyState.errors.name[0]}</p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">CNPJ *</label>
-            <input
-              name="cnpj"
-              defaultValue={selectedCompany?.cnpj ?? ''}
-              placeholder="00.000.000/0000-00"
-              required
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-            />
-            {companyState?.errors?.cnpj && (
-              <p className="mt-0.5 text-xs text-red-600">{companyState.errors.cnpj[0]}</p>
-            )}
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Porte</label>
-            <select
-              name="size"
-              defaultValue={selectedCompany?.size ?? ''}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-            >
-              <option value="">Selecione</option>
-              {COMPANY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Setor econômico</label>
-            <input
-              name="economic_sector"
-              defaultValue={selectedCompany?.economic_sector ?? ''}
-              placeholder="Ex: Saúde, Tecnologia, Indústria"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Nome do contato</label>
-              <input
-                name="contact_name"
-                defaultValue={selectedCompany?.contact_name ?? ''}
-                placeholder="Responsável pelo contato"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">E-mail do contato</label>
-              <input
-                name="contact_email"
-                type="email"
-                defaultValue={selectedCompany?.contact_email ?? ''}
-                placeholder="contato@empresa.com.br"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-              />
-              {companyState?.errors?.contact_email && (
-                <p className="mt-0.5 text-xs text-red-600">{companyState.errors.contact_email[0]}</p>
-              )}
-            </div>
-          </div>
-          <p className="text-[11px] text-gray-400">
-            Estes são os dados cadastrais da empresa. A pessoa responsável por realizar a
-            avaliação continua sendo o Perfil de Usuário com login próprio (aba Usuários) —
-            cadastrar o CNPJ aqui não substitui a necessidade de um usuário.
-          </p>
+          <CompanyFields defaults={selectedCompany} errors={companyState?.errors} />
           <div className="flex justify-end">
             <SaveButton />
           </div>

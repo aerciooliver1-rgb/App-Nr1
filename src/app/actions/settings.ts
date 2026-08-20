@@ -81,6 +81,35 @@ const companySchema = z.object({
   contact_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
 })
 
+export async function registerCompany(
+  prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.' }
+
+  const { data: profile } = await supabase
+    .from('profiles').select('account_id').eq('id', user.id).single()
+  if (!profile?.account_id) return { error: 'Conta não encontrada para este usuário.' }
+
+  const validated = companySchema.safeParse(Object.fromEntries(formData))
+  if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
+
+  const { error } = await supabase
+    .from('companies')
+    .insert({ ...validated.data, created_by: user.id, account_id: profile.account_id })
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Este CNPJ já está cadastrado.' }
+    return { error: 'Erro ao cadastrar empresa. A RLS pode estar restringindo — apenas admin/colaborador podem cadastrar.' }
+  }
+
+  revalidatePath('/configuracoes')
+  revalidatePath('/empresas')
+  return { success: true }
+}
+
 export async function updateCompany(
   prev: SettingsFormState,
   formData: FormData,
