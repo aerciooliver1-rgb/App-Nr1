@@ -17,7 +17,11 @@ async function getData() {
 
   const [{ data: companies }, users, { data: subscription }, { data: responsesThisMonth }] = await Promise.all([
     accountId
-      ? supabase.from('companies').select('id, name, logo_url').eq('account_id', accountId).order('name')
+      ? supabase
+          .from('companies')
+          .select('id, name, logo_url, cnpj, economic_sector, size, contact_name, contact_email')
+          .eq('account_id', accountId)
+          .order('name')
       : Promise.resolve({ data: [] }),
     listUsers(),
     accountId
@@ -49,6 +53,11 @@ export interface CompanyOption {
   id: string
   name: string
   logo_url: string | null
+  cnpj: string
+  economic_sector: string | null
+  size: string | null
+  contact_name: string | null
+  contact_email: string | null
 }
 
 export interface SubscriptionData {

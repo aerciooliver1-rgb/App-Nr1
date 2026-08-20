@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { validateCNPJ } from '@/lib/utils'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,15 @@ export async function updatePassword(
 
 // ─── Atualizar dados da empresa ───────────────────────────────────────────────
 
+const companySchema = z.object({
+  name: z.string().min(2, 'Nome deve ter ao menos 2 caracteres'),
+  cnpj: z.string().refine(validateCNPJ, { message: 'CNPJ inválido' }),
+  economic_sector: z.string().optional(),
+  size: z.string().optional(),
+  contact_name: z.string().optional(),
+  contact_email: z.string().email('E-mail inválido').optional().or(z.literal('')),
+})
+
 export async function updateCompany(
   prev: SettingsFormState,
   formData: FormData,
@@ -80,16 +90,23 @@ export async function updateCompany(
   if (!user) return { error: 'Não autorizado.' }
 
   const companyId = formData.get('company_id') as string
-  const name = (formData.get('name') as string)?.trim()
-  if (!name) return { error: 'Informe o nome da empresa.' }
+  const validated = companySchema.safeParse(Object.fromEntries(formData))
+  if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
 
-  const { error } = await supabase
+  // A RLS restringe a edição a admin/superadmin da própria conta; `.select()`
+  // detecta silenciosamente uma tentativa sem permissão (0 linhas afetadas).
+  const { data, error } = await supabase
     .from('companies')
-    .update({ name })
+    .update(validated.data)
     .eq('id', companyId)
-    .eq('created_by', user.id)
+    .select('id')
+    .maybeSingle()
 
-  if (error) return { error: 'Erro ao atualizar empresa.' }
+  if (error) {
+    if (error.code === '23505') return { error: 'Este CNPJ já está cadastrado em outra empresa.' }
+    return { error: 'Erro ao atualizar empresa.' }
+  }
+  if (!data) return { error: 'Você não tem permissão para editar esta empresa.' }
 
   revalidatePath('/configuracoes')
   revalidatePath('/empresas')
@@ -129,13 +146,15 @@ export async function uploadCompanyLogo(
 
   const { data: { publicUrl } } = serviceClient.storage.from('logos').getPublicUrl(path)
 
-  const { error: updateError } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('companies')
     .update({ logo_url: publicUrl })
     .eq('id', companyId)
-    .eq('created_by', user.id)
+    .select('id')
+    .maybeSingle()
 
   if (updateError) return { error: 'Upload feito, mas erro ao salvar URL.' }
+  if (!updated) return { error: 'Você não tem permissão para editar esta empresa.' }
 
   revalidatePath('/configuracoes')
   revalidatePath('/empresas')

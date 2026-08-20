@@ -154,6 +154,8 @@ function PerfilTab({ userName, userEmail, userRegistry }: { userName: string; us
 
 // ─── Aba Empresa ──────────────────────────────────────────────────────────────
 
+const COMPANY_SIZES = ['Microempresa', 'Pequeno porte', 'Médio porte', 'Grande porte']
+
 function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
   const [selectedId, setSelectedId] = useState(companies[0]?.id ?? '')
   const selectedCompany = companies.find(c => c.id === selectedId)
@@ -196,18 +198,82 @@ function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
         {companyState?.success && <SuccessBanner message="Empresa atualizada." />}
         {companyState?.error && <ErrorBanner message={companyState.error} />}
 
-        <form action={companyAction} className="mt-3 space-y-4">
+        <form action={companyAction} key={selectedId} className="mt-3 space-y-4">
           <input type="hidden" name="company_id" value={selectedId} />
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Nome da empresa *</label>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Razão social *</label>
             <input
               name="name"
-              key={selectedId}
               defaultValue={selectedCompany?.name ?? ''}
               required
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
             />
+            {companyState?.errors?.name && (
+              <p className="mt-0.5 text-xs text-red-600">{companyState.errors.name[0]}</p>
+            )}
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">CNPJ *</label>
+            <input
+              name="cnpj"
+              defaultValue={selectedCompany?.cnpj ?? ''}
+              placeholder="00.000.000/0000-00"
+              required
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+            />
+            {companyState?.errors?.cnpj && (
+              <p className="mt-0.5 text-xs text-red-600">{companyState.errors.cnpj[0]}</p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Porte</label>
+            <select
+              name="size"
+              defaultValue={selectedCompany?.size ?? ''}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+            >
+              <option value="">Selecione</option>
+              {COMPANY_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Setor econômico</label>
+            <input
+              name="economic_sector"
+              defaultValue={selectedCompany?.economic_sector ?? ''}
+              placeholder="Ex: Saúde, Tecnologia, Indústria"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Nome do contato</label>
+              <input
+                name="contact_name"
+                defaultValue={selectedCompany?.contact_name ?? ''}
+                placeholder="Responsável pelo contato"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">E-mail do contato</label>
+              <input
+                name="contact_email"
+                type="email"
+                defaultValue={selectedCompany?.contact_email ?? ''}
+                placeholder="contato@empresa.com.br"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              />
+              {companyState?.errors?.contact_email && (
+                <p className="mt-0.5 text-xs text-red-600">{companyState.errors.contact_email[0]}</p>
+              )}
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Estes são os dados cadastrais da empresa. A pessoa responsável por realizar a
+            avaliação continua sendo o Perfil de Usuário com login próprio (aba Usuários) —
+            cadastrar o CNPJ aqui não substitui a necessidade de um usuário.
+          </p>
           <div className="flex justify-end">
             <SaveButton />
           </div>
