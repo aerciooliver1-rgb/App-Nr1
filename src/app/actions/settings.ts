@@ -96,13 +96,26 @@ export async function registerCompany(
   const validated = companySchema.safeParse(Object.fromEntries(formData))
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors }
 
-  const { error } = await supabase
+  const { data: company, error } = await supabase
     .from('companies')
     .insert({ ...validated.data, created_by: user.id, account_id: profile.account_id })
+    .select('id')
+    .single()
 
   if (error) {
     if (error.code === '23505') return { error: 'Este CNPJ já está cadastrado.' }
     return { error: 'Erro ao cadastrar empresa. A RLS pode estar restringindo — apenas admin/colaborador podem cadastrar.' }
+  }
+
+  const logo = formData.get('logo') as File | null
+  if (logo && logo.size > 0) {
+    const logoResult = await uploadLogoToStorage(company.id, logo)
+    if (logoResult.error) {
+      revalidatePath('/configuracoes')
+      revalidatePath('/empresas')
+      return { error: `Empresa cadastrada, mas houve um erro no logo: ${logoResult.error}` }
+    }
+    await supabase.from('companies').update({ logo_url: logoResult.publicUrl }).eq('id', company.id)
   }
 
   revalidatePath('/configuracoes')
@@ -144,18 +157,7 @@ export async function updateCompany(
 
 // ─── Upload de logo da empresa ────────────────────────────────────────────────
 
-export async function uploadCompanyLogo(
-  prev: SettingsFormState,
-  formData: FormData,
-): Promise<SettingsFormState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autorizado.' }
-
-  const companyId = formData.get('company_id') as string
-  const file = formData.get('logo') as File
-
-  if (!file || file.size === 0) return { error: 'Selecione uma imagem.' }
+async function uploadLogoToStorage(companyId: string, file: File): Promise<{ publicUrl?: string; error?: string }> {
   if (file.size > 2 * 1024 * 1024) return { error: 'Imagem deve ter no máximo 2 MB.' }
   if (!file.type.startsWith('image/')) return { error: 'Arquivo deve ser uma imagem (JPG, PNG ou SVG).' }
 
@@ -169,15 +171,33 @@ export async function uploadCompanyLogo(
 
   if (uploadError) {
     return {
-      error: `Erro no upload: ${uploadError.message}. Certifique-se de criar o bucket "logos" no Supabase Storage (público).`,
+      error: `${uploadError.message}. Certifique-se de criar o bucket "logos" no Supabase Storage (público).`,
     }
   }
 
   const { data: { publicUrl } } = serviceClient.storage.from('logos').getPublicUrl(path)
+  return { publicUrl }
+}
+
+export async function uploadCompanyLogo(
+  prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autorizado.' }
+
+  const companyId = formData.get('company_id') as string
+  const file = formData.get('logo') as File
+
+  if (!file || file.size === 0) return { error: 'Selecione uma imagem.' }
+
+  const logoResult = await uploadLogoToStorage(companyId, file)
+  if (logoResult.error) return { error: `Erro no upload: ${logoResult.error}` }
 
   const { data: updated, error: updateError } = await supabase
     .from('companies')
-    .update({ logo_url: publicUrl })
+    .update({ logo_url: logoResult.publicUrl })
     .eq('id', companyId)
     .select('id')
     .maybeSingle()

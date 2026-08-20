@@ -231,8 +231,8 @@ function CompanyFields({
       </div>
       <p className="text-[11px] text-gray-400">
         Estes são os dados cadastrais da empresa. A pessoa responsável por realizar a
-        avaliação continua sendo o Perfil de Usuário com login próprio (aba Usuários) —
-        cadastrar o CNPJ aqui não substitui a necessidade de um usuário.
+        avaliação continua sendo o Perfil com login próprio (aba Perfil) — cadastrar o
+        CNPJ aqui não substitui a necessidade de um Perfil Avaliador.
       </p>
     </>
   )
@@ -261,8 +261,7 @@ function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Cadastrar Empresa</h3>
         <p className="mb-4 text-xs text-gray-400">
-          Nenhuma empresa cadastrada nesta conta ainda. Preencha os dados abaixo para começar
-          (o upload de logo fica disponível assim que a empresa for salva).
+          Nenhuma empresa cadastrada nesta conta ainda. Preencha os dados abaixo para começar.
         </p>
 
         {registerState?.success && <SuccessBanner message="Empresa cadastrada com sucesso." />}
@@ -270,6 +269,25 @@ function EmpresaTab({ companies }: { companies: CompanyOption[] }) {
 
         <form action={registerAction} className="mt-3 space-y-4">
           <CompanyFields errors={registerState?.errors} />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Logo da Empresa</label>
+            <p className="mb-1.5 text-xs text-gray-400">JPG, PNG ou SVG · máx. 2 MB (opcional)</p>
+            {previewUrl && (
+              <div className="relative mb-2 h-20 w-40 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                <Image src={previewUrl} alt="Pré-visualização da logo" fill className="object-contain p-2" unoptimized />
+              </div>
+            )}
+            <input
+              name="logo"
+              type="file"
+              accept="image/*"
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) setPreviewUrl(URL.createObjectURL(file))
+              }}
+              className="w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+            />
+          </div>
           <div className="flex justify-end">
             <SaveButton label="Cadastrar empresa" />
           </div>
