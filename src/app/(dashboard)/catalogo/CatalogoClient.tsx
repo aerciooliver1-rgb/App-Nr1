@@ -471,10 +471,15 @@ function InfoItem({ label, value }: { label: string; value: string | null }) {
 function ProgramCard({
   program,
   onDeleted,
+  role,
 }: {
   program: ProgramRow
   onDeleted: (id: string) => void
+  role: string | null
 }) {
+  // Superadmin gerencia todo o catálogo; admin de conta só gerencia os
+  // programas personalizados que criou (o padrão é somente leitura para ele).
+  const canManage = role === 'superadmin' || (role === 'admin' && program.type === 'personalizado')
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [, startTransition] = useTransition()
@@ -508,7 +513,7 @@ function ProgramCard({
 
   const cfg = LEVEL_CONFIG[program.level ?? ''] ?? null
 
-  if (editing) {
+  if (editing && canManage) {
     return (
       <li className="rounded-xl border border-blue-200 bg-blue-50/50 p-5">
         <ProgramForm
@@ -579,21 +584,23 @@ function ProgramCard({
 
       {deleteError && <p className="mt-2 text-xs text-red-600">{deleteError}</p>}
 
-      {/* Ações */}
-      <div className="mt-3 flex justify-end gap-2">
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-        >
-          Editar
-        </button>
-        <button
-          onClick={handleDelete}
-          className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-        >
-          Excluir
-        </button>
-      </div>
+      {/* Ações — apenas superadmin gerencia; demais níveis têm acesso somente leitura */}
+      {canManage && (
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            onClick={() => setEditing(true)}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Editar
+          </button>
+          <button
+            onClick={handleDelete}
+            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+          >
+            Excluir
+          </button>
+        </div>
+      )}
 
       {openDetail && (
         <ProgramDetailModal
@@ -608,7 +615,14 @@ function ProgramCard({
 
 // ─── Container principal ──────────────────────────────────────────────────────
 
-export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRow[] }) {
+export function CatalogoClient({
+  initialPrograms,
+  role,
+}: {
+  initialPrograms: ProgramRow[]
+  role: string | null
+}) {
+  const canCreate = role === 'superadmin' || role === 'admin'
   const [programs, setPrograms] = useState<ProgramRow[]>(initialPrograms)
   const [showForm, setShowForm] = useState(false)
   const [openLevel, setOpenLevel] = useState<string | null>(null)
@@ -635,16 +649,18 @@ export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRo
         <p className="text-sm text-gray-500">
           {programs.length} programa(s) no catálogo — cobrindo os 13 fatores de risco NR-1
         </p>
-        <button
-          onClick={() => setShowForm(s => !s)}
-          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          {showForm ? 'Cancelar' : '+ Novo Programa'}
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setShowForm(s => !s)}
+            className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            {showForm ? 'Cancelar' : '+ Novo Programa'}
+          </button>
+        )}
       </div>
 
       {/* Formulário de novo programa */}
-      {showForm && <NewProgramForm onCreated={handleCreated} />}
+      {canCreate && showForm && <NewProgramForm onCreated={handleCreated} />}
 
       {/* Cards de nível — estilo cards da página Empresas */}
       {programs.length === 0 ? (
@@ -718,6 +734,7 @@ export function CatalogoClient({ initialPrograms }: { initialPrograms: ProgramRo
           programs={openGroup.items}
           onClose={() => setOpenLevel(null)}
           onDeleted={id => setPrograms(ps => ps.filter(x => x.id !== id))}
+          role={role}
         />
       )}
     </div>
@@ -731,11 +748,13 @@ function LevelProgramsModal({
   programs,
   onClose,
   onDeleted,
+  role,
 }: {
   level: string
   programs: ProgramRow[]
   onClose: () => void
   onDeleted: (id: string) => void
+  role: string | null
 }) {
   const cfg = LEVEL_CONFIG[level]
 
@@ -769,7 +788,7 @@ function LevelProgramsModal({
           ) : (
             <ul className="space-y-3">
               {programs.map(p => (
-                <ProgramCard key={p.id} program={p} onDeleted={onDeleted} />
+                <ProgramCard key={p.id} program={p} onDeleted={onDeleted} role={role} />
               ))}
             </ul>
           )}

@@ -34,14 +34,14 @@ export interface ProgramRow {
 const PROGRAM_FIELDS =
   'id, name, description, type, created_at, code, level, factor_ids, workload, start_deadline, target_audience, modality, sessions, objectives, structure, methodology, materials, indicators, score_range, deliverable_title, deliverable_content_label, deliverable_content_fields'
 
-// ─── Listar programas padrão ──────────────────────────────────────────────────
+// ─── Listar catálogo (padrão + personalizados da própria conta) ──────────────
 
-export async function listPadraoPrograms(): Promise<ProgramRow[]> {
+export async function listCatalogPrograms(): Promise<ProgramRow[]> {
   const supabase = await createClient()
+  // RLS já restringe a: todo o catálogo padrão + apenas os personalizados da própria conta.
   const { data } = await supabase
     .from('programs')
     .select(PROGRAM_FIELDS)
-    .eq('type', 'padrao')
     .eq('active', true)
     .order('code')
   return (data ?? []) as ProgramRow[]
@@ -100,28 +100,47 @@ function extractFields(formData: FormData) {
   }
 }
 
-async function requireAdmin() {
+async function getAuthContext() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { supabase, error: 'Não autorizado.' }
+  if (!user) return { supabase, error: 'Não autorizado.' } as const
   const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'superadmin') return { supabase, error: 'Apenas a administração da plataforma pode gerenciar o catálogo padrão.' }
-  return { supabase, user }
+    .from('profiles').select('role, account_id').eq('id', user.id).single()
+  return { supabase, user, role: profile?.role ?? null, accountId: profile?.account_id ?? null }
+}
+
+/** Superadmin gerencia o catálogo padrão; admin de conta gerencia apenas os programas
+ *  personalizados que criou para a própria conta. */
+async function canManageProgram(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  role: string | null,
+  accountId: string | null,
+  programId: string,
+) {
+  if (role === 'superadmin') return true
+  if (role !== 'admin') return false
+  const { data: program } = await supabase
+    .from('programs').select('type, account_id').eq('id', programId).single()
+  return program?.type === 'personalizado' && program.account_id === accountId
 }
 
 // ─── Criar programa ───────────────────────────────────────────────────────────
 
 export async function createProgram(prev: ProgramFormState, formData: FormData): Promise<ProgramFormState> {
-  const { supabase, user, error: authError } = await requireAdmin()
+  const { supabase, user, role, accountId, error: authError } = await getAuthContext()
   if (authError || !user) return { error: authError }
+  if (role !== 'superadmin' && role !== 'admin') {
+    return { error: 'Você não tem permissão para criar programas.' }
+  }
 
   const parsed = extractFields(formData)
   if ('errors' in parsed) return { errors: parsed.errors }
 
+  const isSuperadmin = role === 'superadmin'
   const { error } = await supabase.from('programs').insert({
     ...parsed.fields,
-    type: 'padrao',
+    type: isSuperadmin ? 'padrao' : 'personalizado',
+    account_id: isSuperadmin ? null : accountId,
     created_by: user.id,
   })
 
@@ -138,8 +157,11 @@ export async function updateProgram(
   prev: ProgramFormState,
   formData: FormData,
 ): Promise<ProgramFormState> {
-  const { supabase, error: authError } = await requireAdmin()
+  const { supabase, role, accountId, error: authError } = await getAuthContext()
   if (authError) return { error: authError }
+  if (!(await canManageProgram(supabase, role, accountId, programId))) {
+    return { error: 'Você não tem permissão para editar este programa.' }
+  }
 
   const parsed = extractFields(formData)
   if ('errors' in parsed) return { errors: parsed.errors }
@@ -148,7 +170,6 @@ export async function updateProgram(
     .from('programs')
     .update({ ...parsed.fields, updated_at: new Date().toISOString() })
     .eq('id', programId)
-    .eq('type', 'padrao')
 
   if (error) return { error: 'Erro ao atualizar programa.' }
 
@@ -159,14 +180,16 @@ export async function updateProgram(
 // ─── Excluir programa ─────────────────────────────────────────────────────────
 
 export async function deleteProgram(programId: string): Promise<{ error?: string }> {
-  const { supabase, error: authError } = await requireAdmin()
+  const { supabase, role, accountId, error: authError } = await getAuthContext()
   if (authError) return { error: authError }
+  if (!(await canManageProgram(supabase, role, accountId, programId))) {
+    return { error: 'Você não tem permissão para excluir este programa.' }
+  }
 
   const { error } = await supabase
     .from('programs')
     .delete()
     .eq('id', programId)
-    .eq('type', 'padrao')
 
   if (error) return { error: 'Erro ao excluir programa. Pode estar em uso por avaliações.' }
 

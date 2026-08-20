@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/Header'
-import { listPadraoPrograms } from '@/app/actions/programs'
+import { listCatalogPrograms } from '@/app/actions/programs'
 import { CatalogoClient } from './CatalogoClient'
 
 export default async function CatalogoPage() {
@@ -12,23 +12,8 @@ export default async function CatalogoPage() {
   const { data: profile } = await supabase
     .from('profiles').select('role').eq('id', user.id).single()
 
-  if (profile?.role !== 'superadmin') {
-    return (
-      <>
-        <Header title="Catálogo de Programas" />
-        <div className="flex h-[60vh] items-center justify-center p-6">
-          <div className="text-center">
-            <p className="text-sm font-medium text-gray-700">Acesso restrito</p>
-            <p className="mt-1 text-xs text-gray-400">
-              Apenas a administração da plataforma pode gerenciar o catálogo de programas.
-            </p>
-          </div>
-        </div>
-      </>
-    )
-  }
-
-  const programs = await listPadraoPrograms()
+  const role = profile?.role ?? null
+  const programs = await listCatalogPrograms()
 
   return (
     <>
@@ -37,9 +22,11 @@ export default async function CatalogoPage() {
         <div className="mx-auto max-w-5xl space-y-4">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-3 text-sm text-blue-700">
             Programas padrão ficam disponíveis para todos os usuários ao montar planos de ação.
-            Apenas administradores podem criar, editar e excluir programas deste catálogo.
+            {role === 'superadmin' && ' Apenas a administração da plataforma pode criar, editar e excluir programas do catálogo padrão.'}
+            {role === 'admin' && ' Você pode criar seus próprios programas personalizados; apenas a administração da plataforma edita os programas do catálogo padrão.'}
+            {role !== 'superadmin' && role !== 'admin' && ' Apenas administradores podem criar, editar e excluir programas.'}
           </div>
-          <CatalogoClient initialPrograms={programs} />
+          <CatalogoClient initialPrograms={programs} role={role} />
         </div>
       </div>
     </>
