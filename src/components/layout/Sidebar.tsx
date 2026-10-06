@@ -15,7 +15,8 @@ const nav = [
 ]
 
 const superadminNav = [
-  { href: '/contas', label: 'Contas', icon: 'accounts' },
+  { href: '/contas',    label: 'Contas',    icon: 'accounts' },
+  { href: '/changelog', label: 'Changelog', icon: 'log'      },
 ]
 
 function NavIcon({ name }: { name: string }) {
@@ -75,6 +76,12 @@ function NavIcon({ name }: { name: string }) {
       <circle cx="14" cy="6" r="2.5" />
       <path d="M2.5 17v-1a4.5 4.5 0 019 0v1" />
       <path d="M11 12.5a4.5 4.5 0 016.5 4v.5" />
+    </svg>
+  )
+  if (name === 'log') return (
+    <svg {...props}>
+      <path d="M5 3h7l4 4v10a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z" />
+      <path d="M7 10h6M7 13h4" />
     </svg>
   )
   if (name === 'logout') return (

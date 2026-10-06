@@ -15,15 +15,16 @@ interface AccountRow {
   createdAt: string | null
 }
 
+/** Lê via service role: o superadmin não enxerga dados de clientes pela RLS
+ *  (migration 025). Aqui só entram identificação da conta e contagens. */
 async function getAccounts(): Promise<AccountRow[]> {
-  const supabase = await createClient()
   const serviceClient = await createServiceClient()
 
   const [{ data: accounts }, { data: profiles }, { data: companies }, { data: subscriptions }] = await Promise.all([
-    supabase.from('accounts').select('id, owner_id, created_at').order('created_at', { ascending: false }),
-    supabase.from('profiles').select('id, full_name, role, account_id'),
-    supabase.from('companies').select('id, account_id'),
-    supabase.from('subscriptions').select('account_id, plan_type, status'),
+    serviceClient.from('accounts').select('id, owner_id, created_at').order('created_at', { ascending: false }),
+    serviceClient.from('profiles').select('id, full_name, role, account_id'),
+    serviceClient.from('companies').select('id, account_id'),
+    serviceClient.from('subscriptions').select('account_id, plan_type, status'),
   ])
 
   const { data: authUsersPage } = await serviceClient.auth.admin.listUsers({ perPage: 1000 })
