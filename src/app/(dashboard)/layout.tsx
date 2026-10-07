@@ -36,11 +36,26 @@ export default async function DashboardLayout({ children }: { children: React.Re
     ? await supabase.from('profiles').select('role').eq('id', user.id).single()
     : { data: null }
 
+  const isSuperadmin = profile?.role === 'superadmin'
+
+  // demo_requests não tem policy de SELECT (ver migration 026) — só a
+  // service role conta quantas solicitações ainda não foram atendidas, pra
+  // acender o sinal ao lado de "Demonstrações" no menu.
+  let hasPendingDemoRequests = false
+  if (isSuperadmin) {
+    const serviceClient = await createServiceClient()
+    const { count } = await serviceClient
+      .from('demo_requests')
+      .select('id', { count: 'exact', head: true })
+      .is('contacted_at', null)
+    hasPendingDemoRequests = (count ?? 0) > 0
+  }
+
   const impersonation = await getImpersonationBannerData()
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar isSuperadmin={profile?.role === 'superadmin'} />
+      <Sidebar isSuperadmin={isSuperadmin} hasPendingDemoRequests={hasPendingDemoRequests} />
       <main className="flex flex-1 flex-col overflow-y-auto">
         {impersonation && <ImpersonationBanner {...impersonation} />}
         {children}

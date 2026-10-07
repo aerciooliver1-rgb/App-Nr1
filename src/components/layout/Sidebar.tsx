@@ -100,7 +100,13 @@ function NavIcon({ name }: { name: string }) {
   return null
 }
 
-export function Sidebar({ isSuperadmin = false }: { isSuperadmin?: boolean }) {
+export function Sidebar({
+  isSuperadmin = false,
+  hasPendingDemoRequests = false,
+}: {
+  isSuperadmin?: boolean
+  hasPendingDemoRequests?: boolean
+}) {
   const pathname = usePathname()
   const items = isSuperadmin ? [...nav, ...superadminNav] : nav
 
@@ -140,6 +146,22 @@ export function Sidebar({ isSuperadmin = false }: { isSuperadmin?: boolean }) {
             >
               <NavIcon name={icon} />
               {label}
+              {href === '/demonstracoes' && (
+                <span
+                  className="relative ml-auto flex h-2 w-2 shrink-0"
+                  title={hasPendingDemoRequests ? 'Há solicitações pendentes' : 'Nenhuma solicitação pendente'}
+                >
+                  {hasPendingDemoRequests && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  )}
+                  <span
+                    className={cn(
+                      'relative inline-flex h-2 w-2 rounded-full',
+                      hasPendingDemoRequests ? 'bg-emerald-400' : 'bg-slate-700'
+                    )}
+                  />
+                </span>
+              )}
             </Link>
           )
         })}
