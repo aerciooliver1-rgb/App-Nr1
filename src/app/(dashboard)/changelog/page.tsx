@@ -4,6 +4,17 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 const LIMITE = 500
 
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+interface LogRow {
+  id: string
+  action: string
+  table_name: string | null
+  user_id: string | null
+  account_id: string | null
+  created_at: string | null
+}
+
 interface EventoRow {
   id: string
   created_at: string | null
@@ -13,10 +24,77 @@ interface EventoRow {
   userName: string
 }
 
-async function enriquecer(
-  serviceClient: Awaited<ReturnType<typeof createServiceClient>>,
-  logs: { id: string; action: string; table_name: string | null; user_id: string | null; account_id: string | null; created_at: string | null }[],
-): Promise<EventoRow[]> {
+/** Usuários cujo nome ou e-mail batem com a busca. */
+async function buscarUsuarios(serviceClient: ServiceClient, termo: string) {
+  const termoLower = termo.toLowerCase()
+
+  const [{ data: profiles }, { data: authUsersPage }] = await Promise.all([
+    serviceClient.from('profiles').select('id, full_name'),
+    serviceClient.auth.admin.listUsers({ perPage: 1000 }),
+  ])
+
+  const emailByUserId = new Map((authUsersPage?.users ?? []).map(u => [u.id, u.email ?? '']))
+
+  return (profiles ?? [])
+    .filter(p =>
+      (p.full_name ?? '').toLowerCase().includes(termoLower) ||
+      (emailByUserId.get(p.id) ?? '').toLowerCase().includes(termoLower)
+    )
+    .map(p => ({ id: p.id, full_name: p.full_name, email: emailByUserId.get(p.id) ?? '—' }))
+}
+
+/** Busca os eventos por usuário e/ou data (qualquer um dos dois, ou os dois).
+ *
+ *  A busca por usuário cruza três formas de aparecer no log, porque
+ *  `audit_logs.user_id` guarda quem EXECUTOU a ação, não necessariamente a
+ *  pessoa buscada — ex.: ao "Entrar como", quem fica em `user_id` é o
+ *  superadmin, e o nome/e-mail de quem foi acessado só aparece no texto do
+ *  evento. Por isso cruza: (1) eventos feitos por ela, (2) eventos na conta
+ *  dela, (3) eventos cujo texto cita seu nome/e-mail.
+ */
+async function buscarEventos(
+  serviceClient: ServiceClient,
+  { usuarioQuery, dataISO }: { usuarioQuery: string; dataISO: string | null },
+) {
+  const porId = new Map<string, LogRow>()
+
+  async function rodar(aplicarFiltro: (q: any) => any) {
+    let q = serviceClient
+      .from('audit_logs')
+      .select('id, action, table_name, user_id, account_id, created_at')
+    q = aplicarFiltro(q)
+    if (dataISO) q = q.gte('created_at', dataISO)
+    const { data } = await q.order('created_at', { ascending: false }).limit(LIMITE)
+    for (const row of (data ?? []) as LogRow[]) porId.set(row.id, row)
+  }
+
+  let usuariosEncontrados: { id: string; full_name: string | null; email: string }[] = []
+
+  if (usuarioQuery) {
+    usuariosEncontrados = await buscarUsuarios(serviceClient, usuarioQuery)
+    const ids = usuariosEncontrados.map(u => u.id)
+
+    if (ids.length > 0) {
+      await rodar(q => q.in('user_id', ids))
+
+      const { data: contasDoUsuario } = await serviceClient.from('accounts').select('id').in('owner_id', ids)
+      const accountIds = (contasDoUsuario ?? []).map(a => a.id)
+      if (accountIds.length > 0) await rodar(q => q.in('account_id', accountIds))
+    }
+
+    await rodar(q => q.ilike('action', `%${usuarioQuery}%`))
+  } else if (dataISO) {
+    await rodar(q => q)
+  }
+
+  const logs = [...porId.values()]
+    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+    .slice(0, LIMITE)
+
+  return { usuariosEncontrados, logs }
+}
+
+async function enriquecer(serviceClient: ServiceClient, logs: LogRow[]): Promise<EventoRow[]> {
   const userIds = [...new Set(logs.map(l => l.user_id).filter((id): id is string => !!id))]
   const accountIds = [...new Set(logs.map(l => l.account_id).filter((id): id is string => !!id))]
 
@@ -40,26 +118,6 @@ async function enriquecer(
     accountName: l.account_id ? donoDaConta.get(l.account_id) ?? '—' : 'Plataforma',
     userName: l.user_id ? nomeDoPerfil.get(l.user_id) ?? '—' : 'Sistema',
   }))
-}
-
-/** Usuários cujo nome ou e-mail batem com a busca — por nome (profiles.full_name)
- *  ou e-mail (auth.users), já que nem sempre quem procura lembra o nome exato. */
-async function buscarUsuarios(serviceClient: Awaited<ReturnType<typeof createServiceClient>>, termo: string) {
-  const termoLower = termo.toLowerCase()
-
-  const [{ data: profiles }, { data: authUsersPage }] = await Promise.all([
-    serviceClient.from('profiles').select('id, full_name'),
-    serviceClient.auth.admin.listUsers({ perPage: 1000 }),
-  ])
-
-  const emailByUserId = new Map((authUsersPage?.users ?? []).map(u => [u.id, u.email ?? '']))
-
-  return (profiles ?? [])
-    .filter(p =>
-      (p.full_name ?? '').toLowerCase().includes(termoLower) ||
-      (emailByUserId.get(p.id) ?? '').toLowerCase().includes(termoLower)
-    )
-    .map(p => ({ id: p.id, full_name: p.full_name, email: emailByUserId.get(p.id) ?? '—' }))
 }
 
 export default async function ChangelogPage({
@@ -92,33 +150,21 @@ export default async function ChangelogPage({
   const sp = await searchParams
   const usuarioQuery = (sp.usuario ?? '').trim()
   const dataQuery = sp.data ?? ''
+  const dataISO = dataQuery ? new Date(`${dataQuery}T00:00:00`).toISOString() : null
+  const buscou = usuarioQuery.length > 0 || dataQuery.length > 0
 
   const serviceClient = await createServiceClient()
 
   let usuariosEncontrados: { id: string; full_name: string | null; email: string }[] = []
   let eventos: EventoRow[] = []
-  let buscou = false
 
-  if (usuarioQuery) {
-    buscou = true
-    usuariosEncontrados = await buscarUsuarios(serviceClient, usuarioQuery)
-
-    if (usuariosEncontrados.length > 0) {
-      let query = serviceClient
-        .from('audit_logs')
-        .select('id, action, table_name, user_id, account_id, created_at')
-        .in('user_id', usuariosEncontrados.map(u => u.id))
-        .order('created_at', { ascending: false })
-        .limit(LIMITE)
-
-      if (dataQuery) {
-        query = query.gte('created_at', new Date(`${dataQuery}T00:00:00`).toISOString())
-      }
-
-      const { data: logs } = await query
-      eventos = await enriquecer(serviceClient, logs ?? [])
-    }
+  if (buscou) {
+    const resultado = await buscarEventos(serviceClient, { usuarioQuery, dataISO })
+    usuariosEncontrados = resultado.usuariosEncontrados
+    eventos = await enriquecer(serviceClient, resultado.logs)
   }
+
+  const semResultado = buscou && eventos.length === 0
 
   return (
     <>
@@ -137,7 +183,7 @@ export default async function ChangelogPage({
                 type="text"
                 name="usuario"
                 defaultValue={sp.usuario ?? ''}
-                placeholder="Ex.: Aline Oliveira"
+                placeholder="Ex.: Aline"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
               />
             </div>
@@ -165,23 +211,25 @@ export default async function ChangelogPage({
 
           {!buscou && (
             <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center">
-              <p className="text-gray-400">Busque por um usuário para ver os eventos registrados.</p>
+              <p className="text-gray-400">Informe um usuário, uma data, ou os dois, para ver os eventos registrados.</p>
             </div>
           )}
 
-          {buscou && usuariosEncontrados.length === 0 && (
+          {semResultado && (
             <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center">
-              <p className="text-gray-400">Nenhum usuário encontrado com &quot;{usuarioQuery}&quot;.</p>
+              <p className="text-gray-400">Nenhum evento encontrado para essa busca.</p>
             </div>
           )}
 
-          {buscou && usuariosEncontrados.length > 0 && (
+          {buscou && eventos.length > 0 && (
             <>
-              <p className="text-xs text-gray-400">
-                {usuariosEncontrados.length === 1
-                  ? <>Usuário: <span className="font-medium text-gray-600">{usuariosEncontrados[0].full_name ?? usuariosEncontrados[0].email}</span></>
-                  : <>{usuariosEncontrados.length} usuários encontrados: {usuariosEncontrados.map(u => u.full_name ?? u.email).join(', ')}</>}
-              </p>
+              {usuariosEncontrados.length > 0 && (
+                <p className="text-xs text-gray-400">
+                  {usuariosEncontrados.length === 1
+                    ? <>Usuário: <span className="font-medium text-gray-600">{usuariosEncontrados[0].full_name ?? usuariosEncontrados[0].email}</span></>
+                    : <>{usuariosEncontrados.length} usuários encontrados: {usuariosEncontrados.map(u => u.full_name ?? u.email).join(', ')}</>}
+                </p>
+              )}
 
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
@@ -208,13 +256,6 @@ export default async function ChangelogPage({
                         <td className="px-4 py-3 text-xs text-gray-400">{e.table_name ?? '—'}</td>
                       </tr>
                     ))}
-                    {eventos.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
-                          Nenhum evento registrado para esse usuário{dataQuery ? ' a partir dessa data' : ''}.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
