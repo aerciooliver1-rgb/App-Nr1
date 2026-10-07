@@ -184,7 +184,7 @@ export default async function ChangelogPage({
                 name="usuario"
                 defaultValue={sp.usuario ?? ''}
                 placeholder="Ex.: Aline"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none"
               />
             </div>
             <div>
@@ -193,7 +193,7 @@ export default async function ChangelogPage({
                 type="date"
                 name="data"
                 defaultValue={sp.data ?? ''}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-400 focus:outline-none"
               />
             </div>
             <button
