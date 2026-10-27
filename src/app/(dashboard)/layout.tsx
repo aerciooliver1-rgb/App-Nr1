@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { IMPERSONATION_COOKIE } from '@/lib/impersonation'
+import { hasUnresolvedWelcomeEmailErrors } from '@/lib/emailFailureStatus'
 
 async function getImpersonationBannerData() {
   const cookieStore = await cookies()
@@ -43,18 +44,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // acender o sinal ao lado de "Demonstrações" no menu.
   let hasPendingDemoRequests = false
   // Idem para falhas no envio do e-mail de boas-vindas pós-compra (webhook da
-  // Hotmart) — acende o sinal ao lado de "Changelog". Sem campo de "resolvido"
-  // (audit_logs é append-only de propósito), então fica aceso até alguém olhar
-  // e resolver manualmente — não é pra ficar silencioso.
+  // Hotmart) — acende o sinal ao lado de "Changelog". Não existe botão de
+  // "marcar como resolvido": clicar em "Reenviar credenciais" já É a ação de
+  // resolução (ver lib/emailFailureStatus.ts) — a luz apaga sozinha quando
+  // isso acontece, sem precisar apagar nada do audit_logs.
   let hasEmailDeliveryErrors = false
   if (isSuperadmin) {
     const serviceClient = await createServiceClient()
-    const [{ count: demoCount }, { count: emailErrorCount }] = await Promise.all([
+    const [{ count: demoCount }, unresolvedEmailErrors] = await Promise.all([
       serviceClient.from('demo_requests').select('id', { count: 'exact', head: true }).is('contacted_at', null),
-      serviceClient.from('audit_logs').select('id', { count: 'exact', head: true }).ilike('action', 'hotmart_erro_envio_email_boas_vindas%'),
+      hasUnresolvedWelcomeEmailErrors(serviceClient),
     ])
     hasPendingDemoRequests = (demoCount ?? 0) > 0
-    hasEmailDeliveryErrors = (emailErrorCount ?? 0) > 0
+    hasEmailDeliveryErrors = unresolvedEmailErrors
   }
 
   const impersonation = await getImpersonationBannerData()
