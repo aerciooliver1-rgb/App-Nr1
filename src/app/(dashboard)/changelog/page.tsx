@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { ResendCredentialsButton } from './ResendCredentialsButton'
+
+const FALHA_ENVIO_EMAIL = 'hotmart_erro_envio_email_boas_vindas'
 
 const LIMITE = 500
 
@@ -22,6 +25,10 @@ interface EventoRow {
   table_name: string | null
   accountName: string
   userName: string
+  /** Falha de envio do e-mail de boas-vindas, com conta associada pra
+   *  reenviar credenciais (logs antigos, de antes dessa coluna, não têm
+   *  user_id e não mostram o botão). */
+  podeReenviarCredenciais: boolean
 }
 
 /** Usuários cujo nome ou e-mail batem com a busca. */
@@ -117,6 +124,7 @@ async function enriquecer(serviceClient: ServiceClient, logs: LogRow[]): Promise
     table_name: l.table_name,
     accountName: l.account_id ? donoDaConta.get(l.account_id) ?? '—' : 'Plataforma',
     userName: l.user_id ? nomeDoPerfil.get(l.user_id) ?? '—' : 'Sistema',
+    podeReenviarCredenciais: l.action.startsWith(FALHA_ENVIO_EMAIL) && !!l.user_id,
   }))
 }
 
@@ -240,6 +248,7 @@ export default async function ChangelogPage({
                       <th className="px-4 py-3">Conta</th>
                       <th className="px-4 py-3">Usuário</th>
                       <th className="px-4 py-3">Tabela</th>
+                      <th className="px-4 py-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -254,6 +263,9 @@ export default async function ChangelogPage({
                         <td className="px-4 py-3 text-gray-700">{e.accountName}</td>
                         <td className="px-4 py-3 text-gray-700">{e.userName}</td>
                         <td className="px-4 py-3 text-xs text-gray-400">{e.table_name ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          {e.podeReenviarCredenciais && <ResendCredentialsButton logId={e.id} />}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

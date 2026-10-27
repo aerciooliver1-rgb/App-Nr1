@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { planFromOfferCode, subscriptionFieldsFor, trialFields, PLAN_LABELS, type PlanId } from '@/lib/hotmart'
+import { planFromOfferCode, subscriptionFieldsFor, trialFields } from '@/lib/hotmart'
 import { generatePassword } from '@/lib/password'
+import { sendWelcomeEmail } from '@/lib/welcomeEmail'
 
 // Webhook da Hotmart (Postback 2.0):
 //   PURCHASE_APPROVED / PURCHASE_COMPLETE  → ativa o plano da oferta comprada
@@ -38,62 +39,17 @@ async function audit(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
   action: string,
   detail: Record<string, unknown>,
+  userId?: string,
 ) {
   // Trilha de auditoria dos eventos de pagamento (tabela audit_logs) —
-  // nunca inclui a senha gerada, só metadados da compra.
+  // nunca inclui a senha gerada, só metadados da compra. `userId` (quando
+  // informado) permite achar a conta depois sem precisar reparsear o texto
+  // de `action` — usado pelo botão "Reenviar credenciais" no Changelog.
   await supabase.from('audit_logs').insert({
     action: `${action}: ${JSON.stringify(detail).slice(0, 500)}`,
     table_name: 'subscriptions',
+    user_id: userId ?? null,
   })
-}
-
-/** E-mail de boas-vindas com a senha de acesso gerada — melhor esforço,
- *  nunca bloqueia a ativação do plano se o envio falhar (mesmo padrão de
- *  actions/approvals.ts). Retorna `false` quando não há como avisar o
- *  cliente — quem chama registra isso no audit_logs, pra não ficar silencioso. */
-async function sendWelcomeEmail(email: string, fullName: string, password: string, plan: PlanId): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey || apiKey === 're_sua_chave_aqui') return false
-
-  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/login`
-  try {
-    const { Resend } = await import('resend')
-    const resend = new Resend(apiKey)
-    await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com',
-      to: email,
-      subject: 'Seu acesso ao DRPS está liberado!',
-      html: `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-          <h2 style="color:#1e40af">Bem-vindo(a) ao DRPS</h2>
-          <p>Olá, <strong>${fullName}</strong>,</p>
-          <p>Seu pagamento do plano <strong>${PLAN_LABELS[plan]}</strong> foi aprovado e sua conta
-             já está ativa. Seus dados de acesso:</p>
-          <table style="margin:20px 0;border-collapse:collapse">
-            <tr><td style="padding:4px 12px 4px 0;color:#6b7280">E-mail</td><td><strong>${email}</strong></td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#6b7280">Senha</td><td><strong>${password}</strong></td></tr>
-          </table>
-          <p style="margin:24px 0">
-            <a href="${loginUrl}"
-               style="background:#1e40af;color:#fff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold">
-              Entrar na plataforma
-            </a>
-          </p>
-          <p style="color:#6b7280;font-size:13px">
-            Por segurança, recomendamos trocar essa senha depois do primeiro acesso, em
-            Configurações → Perfil, ou pelo link "Esqueci minha senha" na tela de login.
-          </p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-          <p style="color:#9ca3af;font-size:12px">
-            Sistema de Gestão de Riscos Psicossociais — NR-1 / Portaria MTE nº 1.419/2024
-          </p>
-        </div>
-      `,
-    })
-    return true
-  } catch {
-    return false
-  }
 }
 
 export async function POST(request: Request) {
@@ -200,7 +156,8 @@ export async function POST(request: Request) {
       // Cliente pagou e a conta existe, mas não recebeu e-mail nenhum com a senha —
       // precisa de ação manual (reenviar credenciais). Ação própria pra não passar
       // despercebido dentro do log geral: ver sinalizador em "Changelog" no menu.
-      await audit(supabase, 'hotmart_erro_envio_email_boas_vindas', { event, email, plan, transaction })
+      // user_id gravado aqui é o que o botão "Reenviar credenciais" usa depois.
+      await audit(supabase, 'hotmart_erro_envio_email_boas_vindas', { event, email, plan, transaction }, created.user.id)
     }
     await audit(supabase, 'hotmart_conta_criada_e_ativada', { event, email, plan, transaction })
     return NextResponse.json({ received: true, created: true, activated: plan })
