@@ -12,6 +12,10 @@
 //   NEXT_PUBLIC_HOTMART_CHECKOUT_MENSAL     URL de checkout do plano Mensal
 //   NEXT_PUBLIC_HOTMART_CHECKOUT_SEMESTRAL  URL de checkout do plano Semestral
 //   NEXT_PUBLIC_HOTMART_CHECKOUT_ANUAL      URL de checkout do plano Anual
+//
+// Produto Hotmart (2026-10-27): M107961788M — substituiu o produto antigo
+// K106645495P (cancelado). As 3 ofertas (off=...) vivem dentro desse mesmo
+// produto; só o código da oferta muda por plano, a base da URL é igual.
 
 import { PLAN_RESPONSE_LIMITS } from '@/lib/billing'
 
