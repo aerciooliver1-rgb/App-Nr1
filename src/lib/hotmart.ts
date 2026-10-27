@@ -21,6 +21,13 @@ import { PLAN_RESPONSE_LIMITS } from '@/lib/billing'
 
 export type PlanId = 'mensal' | 'semestral' | 'anual'
 
+/** Nome comercial exibido ao cliente (o ID interno continua mensal/semestral/anual). */
+export const PLAN_LABELS: Record<PlanId, string> = {
+  mensal: 'Start',
+  semestral: 'Pro',
+  anual: 'Enterprise',
+}
+
 export const PLAN_DURATION_MONTHS: Record<PlanId, number> = {
   mensal: 1,
   semestral: 6,

@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { resetPassword } from '@/app/actions/auth'
+import { PasswordInput } from '@/components/ui/PasswordInput'
 
 function ResetButton() {
   const { pending } = useFormStatus()
@@ -39,13 +40,13 @@ export default function ResetPasswordPage() {
             className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
             Nova senha
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             placeholder="Mínimo 6 caracteres"
             required
-            className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white placeholder-slate-500 transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            iconClassName="text-slate-500 hover:text-slate-300"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white placeholder-slate-500 transition focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           {state?.errors?.password?.[0] && (
             <p className="text-xs text-red-400">{state.errors.password[0]}</p>
