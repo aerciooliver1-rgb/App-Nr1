@@ -4,6 +4,23 @@ import { planFromOfferCode, subscriptionFieldsFor, trialFields } from '@/lib/hot
 import { generatePassword } from '@/lib/password'
 import { sendWelcomeEmail } from '@/lib/welcomeEmail'
 
+// TODO(remover): diagnóstico temporário pra confirmar se RESEND_API_KEY
+// chega até esta function em runtime — nunca expõe a chave, só presença/tamanho.
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  if (url.searchParams.get('diag') !== process.env.HOTMART_HOTTOK) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 })
+  }
+  const key = process.env.RESEND_API_KEY
+  return NextResponse.json({
+    hasResendKey: !!key,
+    resendKeyLength: key?.length ?? 0,
+    resendKeyPrefix: key?.slice(0, 3) ?? null,
+    fromEmail: process.env.RESEND_FROM_EMAIL ?? null,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL ?? null,
+  })
+}
+
 // Webhook da Hotmart (Postback 2.0):
 //   PURCHASE_APPROVED / PURCHASE_COMPLETE  → ativa o plano da oferta comprada
 //     (se o e-mail do comprador não tiver conta ainda, a conta é criada na
