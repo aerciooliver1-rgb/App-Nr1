@@ -36,7 +36,7 @@ export async function sendWelcomeEmail(
     const { Resend } = await import('resend')
     const resend = new Resend(apiKey)
     const { error } = await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com',
+      from: `DRPS <${process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com'}>`,
       to: email,
       subject: retry ? 'Seus dados de acesso ao DRPS (reenvio)' : 'Seu acesso ao DRPS está liberado!',
       html: `

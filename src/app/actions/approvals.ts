@@ -78,7 +78,7 @@ export async function sendForApproval(
       const { Resend } = await import('resend')
       const resend = new Resend(apiKey)
       await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com',
+        from: `DRPS <${process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com'}>`,
         to: recipient_email,
         subject: `Aprovação de Plano NR-1 — ${companyName}`,
         html: `
