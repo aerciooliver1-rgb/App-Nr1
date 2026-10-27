@@ -151,13 +151,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao ativar plano.' }, { status: 500 })
     }
 
-    const emailSent = await sendWelcomeEmail(email, fullName || email, password, plan)
-    if (!emailSent) {
+    const emailResult = await sendWelcomeEmail(email, fullName || email, password, plan)
+    if (!emailResult.ok) {
       // Cliente pagou e a conta existe, mas não recebeu e-mail nenhum com a senha —
       // precisa de ação manual (reenviar credenciais). Ação própria pra não passar
       // despercebido dentro do log geral: ver sinalizador em "Changelog" no menu.
       // user_id gravado aqui é o que o botão "Reenviar credenciais" usa depois.
-      await audit(supabase, 'hotmart_erro_envio_email_boas_vindas', { event, email, plan, transaction }, created.user.id)
+      await audit(
+        supabase,
+        'hotmart_erro_envio_email_boas_vindas',
+        { event, email, plan, transaction, erro: emailResult.error },
+        created.user.id,
+      )
     }
     await audit(supabase, 'hotmart_conta_criada_e_ativada', { event, email, plan, transaction })
     return NextResponse.json({ received: true, created: true, activated: plan })

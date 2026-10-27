@@ -8,15 +8,21 @@ import { PLAN_LABELS, type PlanId } from '@/lib/hotmart'
  *  depois de uma falha de envio — muda o texto pra deixar claro que a
  *  conta já existe e só a senha mudou de novo, sem soar como um segundo
  *  cadastro. */
+export interface SendResult {
+  ok: boolean
+  /** Motivo da falha, pra registrar no audit_logs — nunca a senha. */
+  error?: string
+}
+
 export async function sendWelcomeEmail(
   email: string,
   fullName: string,
   password: string,
   plan: PlanId,
   retry = false,
-): Promise<boolean> {
+): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey || apiKey === 're_sua_chave_aqui') return false
+  if (!apiKey || apiKey === 're_sua_chave_aqui') return { ok: false, error: 'RESEND_API_KEY não configurada' }
 
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/login`
   const intro = retry
@@ -29,7 +35,7 @@ export async function sendWelcomeEmail(
   try {
     const { Resend } = await import('resend')
     const resend = new Resend(apiKey)
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL ?? 'no-reply@example.com',
       to: email,
       subject: retry ? 'Seus dados de acesso ao DRPS (reenvio)' : 'Seu acesso ao DRPS está liberado!',
@@ -59,8 +65,9 @@ export async function sendWelcomeEmail(
         </div>
       `,
     })
-    return true
-  } catch {
-    return false
+    if (error) return { ok: false, error: error.message ?? JSON.stringify(error) }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }

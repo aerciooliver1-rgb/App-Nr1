@@ -55,9 +55,11 @@ export async function resendWelcomeCredentials(logId: string): Promise<{ error?:
   const { error: updateErr } = await serviceClient.auth.admin.updateUserById(userId, { password })
   if (updateErr) return { error: 'Erro ao gerar nova senha.' }
 
-  const sent = await sendWelcomeEmail(email, profile.full_name || email, password, plan, true)
-  if (!sent) {
-    return { error: 'A senha foi trocada, mas o e-mail não saiu de novo — confira a configuração do Resend e tente outra vez.' }
+  const result = await sendWelcomeEmail(email, profile.full_name || email, password, plan, true)
+  if (!result.ok) {
+    return {
+      error: `A senha foi trocada, mas o e-mail não saiu de novo${result.error ? ` (${result.error})` : ''} — confira o Resend e tente de novo.`,
+    }
   }
 
   await serviceClient.from('audit_logs').insert({
