@@ -42,20 +42,30 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // service role conta quantas solicitações ainda não foram atendidas, pra
   // acender o sinal ao lado de "Demonstrações" no menu.
   let hasPendingDemoRequests = false
+  // Idem para falhas no envio do e-mail de boas-vindas pós-compra (webhook da
+  // Hotmart) — acende o sinal ao lado de "Changelog". Sem campo de "resolvido"
+  // (audit_logs é append-only de propósito), então fica aceso até alguém olhar
+  // e resolver manualmente — não é pra ficar silencioso.
+  let hasEmailDeliveryErrors = false
   if (isSuperadmin) {
     const serviceClient = await createServiceClient()
-    const { count } = await serviceClient
-      .from('demo_requests')
-      .select('id', { count: 'exact', head: true })
-      .is('contacted_at', null)
-    hasPendingDemoRequests = (count ?? 0) > 0
+    const [{ count: demoCount }, { count: emailErrorCount }] = await Promise.all([
+      serviceClient.from('demo_requests').select('id', { count: 'exact', head: true }).is('contacted_at', null),
+      serviceClient.from('audit_logs').select('id', { count: 'exact', head: true }).ilike('action', 'hotmart_erro_envio_email_boas_vindas%'),
+    ])
+    hasPendingDemoRequests = (demoCount ?? 0) > 0
+    hasEmailDeliveryErrors = (emailErrorCount ?? 0) > 0
   }
 
   const impersonation = await getImpersonationBannerData()
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar isSuperadmin={isSuperadmin} hasPendingDemoRequests={hasPendingDemoRequests} />
+      <Sidebar
+        isSuperadmin={isSuperadmin}
+        hasPendingDemoRequests={hasPendingDemoRequests}
+        hasEmailDeliveryErrors={hasEmailDeliveryErrors}
+      />
       <main className="flex flex-1 flex-col overflow-y-auto">
         {impersonation && <ImpersonationBanner {...impersonation} />}
         {children}

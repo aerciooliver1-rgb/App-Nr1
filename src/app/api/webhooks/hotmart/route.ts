@@ -49,10 +49,11 @@ async function audit(
 
 /** E-mail de boas-vindas com a senha de acesso gerada — melhor esforço,
  *  nunca bloqueia a ativação do plano se o envio falhar (mesmo padrão de
- *  actions/approvals.ts). */
-async function sendWelcomeEmail(email: string, fullName: string, password: string, plan: PlanId) {
+ *  actions/approvals.ts). Retorna `false` quando não há como avisar o
+ *  cliente — quem chama registra isso no audit_logs, pra não ficar silencioso. */
+async function sendWelcomeEmail(email: string, fullName: string, password: string, plan: PlanId): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey || apiKey === 're_sua_chave_aqui') return
+  if (!apiKey || apiKey === 're_sua_chave_aqui') return false
 
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/login`
   try {
@@ -89,8 +90,9 @@ async function sendWelcomeEmail(email: string, fullName: string, password: strin
         </div>
       `,
     })
+    return true
   } catch {
-    // E-mail falhou mas não bloqueia a ativação — fica registrado no audit_logs
+    return false
   }
 }
 
@@ -193,7 +195,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erro ao ativar plano.' }, { status: 500 })
     }
 
-    await sendWelcomeEmail(email, fullName || email, password, plan)
+    const emailSent = await sendWelcomeEmail(email, fullName || email, password, plan)
+    if (!emailSent) {
+      // Cliente pagou e a conta existe, mas não recebeu e-mail nenhum com a senha —
+      // precisa de ação manual (reenviar credenciais). Ação própria pra não passar
+      // despercebido dentro do log geral: ver sinalizador em "Changelog" no menu.
+      await audit(supabase, 'hotmart_erro_envio_email_boas_vindas', { event, email, plan, transaction })
+    }
     await audit(supabase, 'hotmart_conta_criada_e_ativada', { event, email, plan, transaction })
     return NextResponse.json({ received: true, created: true, activated: plan })
   }

@@ -100,12 +100,27 @@ function NavIcon({ name }: { name: string }) {
   return null
 }
 
+/** Sinal ao lado de um item do menu — aceso (com pulso) quando `on`, apagado
+ *  quando não. `color` muda o significado: emerald = pendência a atender,
+ *  red = erro que precisa de atenção. */
+function NavSignal({ on, color, title }: { on: boolean; color: 'emerald' | 'red'; title: string }) {
+  const tone = color === 'red' ? 'bg-red-500' : 'bg-emerald-400'
+  return (
+    <span className="relative ml-auto flex h-2 w-2 shrink-0" title={title}>
+      {on && <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-75', tone)} />}
+      <span className={cn('relative inline-flex h-2 w-2 rounded-full', on ? tone : 'bg-slate-700')} />
+    </span>
+  )
+}
+
 export function Sidebar({
   isSuperadmin = false,
   hasPendingDemoRequests = false,
+  hasEmailDeliveryErrors = false,
 }: {
   isSuperadmin?: boolean
   hasPendingDemoRequests?: boolean
+  hasEmailDeliveryErrors?: boolean
 }) {
   const pathname = usePathname()
   const items = isSuperadmin ? [...nav, ...superadminNav] : nav
@@ -147,20 +162,20 @@ export function Sidebar({
               <NavIcon name={icon} />
               {label}
               {href === '/demonstracoes' && (
-                <span
-                  className="relative ml-auto flex h-2 w-2 shrink-0"
+                <NavSignal
+                  on={hasPendingDemoRequests}
+                  color="emerald"
                   title={hasPendingDemoRequests ? 'Há solicitações pendentes' : 'Nenhuma solicitação pendente'}
-                >
-                  {hasPendingDemoRequests && (
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  )}
-                  <span
-                    className={cn(
-                      'relative inline-flex h-2 w-2 rounded-full',
-                      hasPendingDemoRequests ? 'bg-emerald-400' : 'bg-slate-700'
-                    )}
-                  />
-                </span>
+                />
+              )}
+              {href === '/changelog' && (
+                <NavSignal
+                  on={hasEmailDeliveryErrors}
+                  color="red"
+                  title={hasEmailDeliveryErrors
+                    ? 'Há e-mail de boas-vindas que falhou ao enviar — busque "hotmart_erro_envio_email" no Changelog'
+                    : 'Nenhum erro de envio de e-mail registrado'}
+                />
               )}
             </Link>
           )
