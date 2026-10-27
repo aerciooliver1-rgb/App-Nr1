@@ -24,7 +24,10 @@ export function PasswordInput({ className, iconClassName, ...props }: PasswordIn
         type="button"
         tabIndex={-1}
         onClick={() => setVisible(v => !v)}
-        aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}
+        // Sem a palavra "senha" no aria-label de propósito: testes e2e (e
+        // leitores de tela) que localizam o campo por getByLabel(/senha/i)
+        // acabavam batendo nesse botão também, não só no input.
+        aria-label={visible ? 'Ocultar caracteres digitados' : 'Mostrar caracteres digitados'}
         className={cn(
           'absolute inset-y-0 right-0 flex items-center px-3 transition-colors',
           iconClassName ?? 'text-gray-400 hover:text-gray-600'
