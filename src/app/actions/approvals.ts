@@ -67,6 +67,11 @@ export async function sendForApproval(
   const sectorName = sector?.name ?? '—'
   const approvalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/aprovacao/${plan_id}`
 
+  // RESEND_API_KEY/RESEND_FROM_EMAIL na Vercel ficaram como placeholder por
+  // um bom tempo (2026-10-27: corrigido, chave real + contato@appdrps.com.br
+  // verificado) — esse e-mail de aprovação ficou silenciosamente sem sair
+  // nesse período, mesmo problema descoberto ao construir o onboarding
+  // automático da Hotmart (ver src/lib/welcomeEmail.ts).
   const apiKey = process.env.RESEND_API_KEY
   if (apiKey && apiKey !== 're_sua_chave_aqui') {
     try {
